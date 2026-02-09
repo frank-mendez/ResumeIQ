@@ -1,4 +1,4 @@
-import { createServerFn } from '@tanstack/start'
+import { createServerFn } from '@tanstack/start/server'
 import { z } from 'zod'
 import { getStripe, STRIPE_PLANS } from '~/lib/stripe.server'
 import { createSupabaseServerClient } from '~/lib/supabase.server'
@@ -9,10 +9,10 @@ const createCheckoutSchema = z.object({
 })
 
 // Server function to create Stripe checkout session
-export const createCheckoutSession = createServerFn({ method: 'POST' })
+export const createCheckoutSession = createServerFn()
   .validator(createCheckoutSchema)
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
     const stripe = getStripe()
 
@@ -62,19 +62,18 @@ export const createCheckoutSession = createServerFn({ method: 'POST' })
   })
 
 // Server function to handle Stripe webhook
-export const handleStripeWebhook = createServerFn({ method: 'POST' }).handler(
-  async ({ context }) => {
-    const stripe = getStripe()
-    const supabase = createSupabaseServerClient(context.request.headers)
+export const handleStripeWebhook = createServerFn().handler(
+  async ({ request }) => {
+    const supabase = createSupabaseServerClient(request.headers)
 
     // Get the webhook signature
-    const signature = context.request.headers.get('stripe-signature')
+    const signature = request.headers.get('stripe-signature')
     if (!signature) {
       throw new Error('Missing stripe-signature header')
     }
 
     // Get raw body
-    const rawBody = await context.request.text()
+    const rawBody = await request.text()
 
     // TODO: In production, verify webhook signature and process events
     // This is a stub that acknowledges the webhook
@@ -146,9 +145,9 @@ export const handleStripeWebhook = createServerFn({ method: 'POST' }).handler(
 )
 
 // Server function to get user subscription
-export const getUserSubscription = createServerFn({ method: 'GET' }).handler(
-  async ({ context }) => {
-    const headers = context.request.headers
+export const getUserSubscription = createServerFn().handler(
+  async ({ request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const {
@@ -179,11 +178,10 @@ export const getUserSubscription = createServerFn({ method: 'GET' }).handler(
 )
 
 // Server function to cancel subscription
-export const cancelSubscription = createServerFn({ method: 'POST' }).handler(
-  async ({ context }) => {
-    const headers = context.request.headers
+export const cancelSubscription = createServerFn().handler(
+  async ({ request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
-    const stripe = getStripe()
 
     const {
       data: { user },

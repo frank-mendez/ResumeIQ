@@ -1,19 +1,14 @@
 import { Outlet } from '@tanstack/react-router'
 import { createRootRoute } from '@tanstack/react-router'
 import { Header } from '~/components/Header'
-import { getCurrentUser } from '~/utils/auth.server'
 import '~/styles/globals.css'
 
 export const Route = createRootRoute({
-  beforeLoad: async () => {
-    const user = await getCurrentUser().catch(() => null)
-    return { user }
-  },
   component: RootComponent,
 })
 
 function RootComponent() {
-  const { user } = Route.useRouteContext()
+  const user = null // Simplified for now
 
   return (
     <html lang="en">

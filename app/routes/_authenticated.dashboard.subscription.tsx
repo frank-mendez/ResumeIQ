@@ -5,7 +5,7 @@ import { LoadingSpinner } from '~/components/LoadingSpinner'
 import { STRIPE_PLANS } from '~/lib/stripe.server'
 
 export const Route = createFileRoute(
-  '/_authenticated/dashboard/subscription'
+  '/_authenticated/dashboard/subscription' as any
 )({
   component: Subscription,
 })

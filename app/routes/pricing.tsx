@@ -3,7 +3,7 @@ import { STRIPE_PLANS } from '~/lib/stripe.server'
 import { createCheckoutSession } from '~/utils/stripe.server'
 import { useState } from 'react'
 
-export const Route = createFileRoute('/pricing')({
+export const Route = createFileRoute('/pricing' as any)({
   component: Pricing,
 })
 

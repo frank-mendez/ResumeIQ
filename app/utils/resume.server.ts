@@ -1,4 +1,4 @@
-import { createServerFn } from '@tanstack/start'
+import { createServerFn } from '@tanstack/start/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '~/lib/supabase.server'
 import type { ResumeAnalysisResult } from '~/types'
@@ -12,10 +12,10 @@ const uploadResumeSchema = z.object({
 })
 
 // Server function to upload resume
-export const uploadResume = createServerFn({ method: 'POST' })
+export const uploadResume = createServerFn()
   .validator(uploadResumeSchema)
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     // Get current user
@@ -49,10 +49,10 @@ export const uploadResume = createServerFn({ method: 'POST' })
   })
 
 // Server function to extract text from resume
-export const extractResumeText = createServerFn({ method: 'POST' })
+export const extractResumeText = createServerFn()
   .validator(z.object({ resumeId: z.string() }))
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     // Get current user
@@ -103,10 +103,10 @@ Sample resume content would appear here...`
   })
 
 // Server function to analyze resume with AI
-export const analyzeResume = createServerFn({ method: 'POST' })
+export const analyzeResume = createServerFn()
   .validator(z.object({ resumeId: z.string() }))
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     // Get current user
@@ -190,9 +190,9 @@ export const analyzeResume = createServerFn({ method: 'POST' })
   })
 
 // Server function to get user's resumes
-export const getUserResumes = createServerFn({ method: 'GET' }).handler(
-  async ({ context }) => {
-    const headers = context.request.headers
+export const getUserResumes = createServerFn().handler(
+  async ({ request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const {
@@ -219,10 +219,10 @@ export const getUserResumes = createServerFn({ method: 'GET' }).handler(
 )
 
 // Server function to get resume analyses
-export const getResumeAnalyses = createServerFn({ method: 'POST' })
+export const getResumeAnalyses = createServerFn()
   .validator(z.object({ resumeId: z.string() }))
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const {

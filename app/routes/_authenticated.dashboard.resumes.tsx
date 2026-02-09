@@ -3,7 +3,7 @@ import { getUserResumes } from '~/utils/resume.server'
 import { useQuery } from '@tanstack/react-query'
 import { LoadingSpinner } from '~/components/LoadingSpinner'
 
-export const Route = createFileRoute('/_authenticated/dashboard/resumes')({
+export const Route = createFileRoute('/_authenticated/dashboard/resumes' as any)({
   component: Resumes,
 })
 
@@ -35,7 +35,7 @@ function Resumes() {
 
       {resumes && resumes.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {resumes.map((resume) => (
+          {resumes.map((resume: any) => (
             <div
               key={resume.id}
               className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"

@@ -1,4 +1,4 @@
-import { createServerFn } from '@tanstack/start'
+import { createServerFn } from '@tanstack/start/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '~/lib/supabase.server'
 import { setCookie } from 'vinxi/http'
@@ -16,10 +16,10 @@ const signInSchema = z.object({
 })
 
 // Server function to sign up
-export const signUp = createServerFn({ method: 'POST' })
+export const signUp = createServerFn()
   .validator(signUpSchema)
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const { data: authData, error } = await supabase.auth.signUp({
@@ -54,10 +54,10 @@ export const signUp = createServerFn({ method: 'POST' })
   })
 
 // Server function to sign in
-export const signIn = createServerFn({ method: 'POST' })
+export const signIn = createServerFn()
   .validator(signInSchema)
-  .handler(async ({ data, context }) => {
-    const headers = context.request.headers
+  .handler(async ({ data, request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -92,9 +92,9 @@ export const signIn = createServerFn({ method: 'POST' })
   })
 
 // Server function to sign out
-export const signOut = createServerFn({ method: 'POST' }).handler(
-  async ({ context }) => {
-    const headers = context.request.headers
+export const signOut = createServerFn().handler(
+  async ({ request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const { error } = await supabase.auth.signOut()
@@ -119,9 +119,9 @@ export const signOut = createServerFn({ method: 'POST' }).handler(
 )
 
 // Server function to get current user
-export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
-  async ({ context }) => {
-    const headers = context.request.headers
+export const getCurrentUser = createServerFn().handler(
+  async ({ request }) => {
+    const headers = request.headers
     const supabase = createSupabaseServerClient(headers)
 
     const {
