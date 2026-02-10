@@ -7,7 +7,9 @@
     "dev": "vite dev",
     "build": "vite build && tsc --noEmit",
     "preview": "vite preview",
-    "start": "node .output/server/index.mjs"
+    "start": "node .output/server/index.mjs",
+    "database:login": "npx supabase login",
+    "database:init": "npx supabase init"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.159.5",
@@ -25,6 +27,7 @@
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.6.0",
     "nitro": "3.0.1-alpha.2",
+    "supabase": "^2.76.7",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.7.2",
     "vite": "^7.3.1",
