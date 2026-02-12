@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RedirectRouteImport } from './routes/redirect'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as ApiUsersUserIdRouteImport } from './routes/api/users.$userId'
@@ -17,6 +18,11 @@ import { Route as ApiUsersUserIdRouteImport } from './routes/api/users.$userId'
 const RedirectRoute = RedirectRouteImport.update({
   id: '/redirect',
   path: '/redirect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,12 +43,14 @@ const ApiUsersUserIdRoute = ApiUsersUserIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/redirect': typeof RedirectRoute
   '/api/users': typeof ApiUsersRouteWithChildren
   '/api/users/$userId': typeof ApiUsersUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/redirect': typeof RedirectRoute
   '/api/users': typeof ApiUsersRouteWithChildren
   '/api/users/$userId': typeof ApiUsersUserIdRoute
@@ -50,20 +58,28 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/redirect': typeof RedirectRoute
   '/api/users': typeof ApiUsersRouteWithChildren
   '/api/users/$userId': typeof ApiUsersUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/redirect' | '/api/users' | '/api/users/$userId'
+  fullPaths: '/' | '/login' | '/redirect' | '/api/users' | '/api/users/$userId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/redirect' | '/api/users' | '/api/users/$userId'
-  id: '__root__' | '/' | '/redirect' | '/api/users' | '/api/users/$userId'
+  to: '/' | '/login' | '/redirect' | '/api/users' | '/api/users/$userId'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/redirect'
+    | '/api/users'
+    | '/api/users/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   RedirectRoute: typeof RedirectRoute
   ApiUsersRoute: typeof ApiUsersRouteWithChildren
 }
@@ -75,6 +91,13 @@ declare module '@tanstack/react-router' {
       path: '/redirect'
       fullPath: '/redirect'
       preLoaderRoute: typeof RedirectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -115,6 +138,7 @@ const ApiUsersRouteWithChildren = ApiUsersRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   RedirectRoute: RedirectRoute,
   ApiUsersRoute: ApiUsersRouteWithChildren,
 }
