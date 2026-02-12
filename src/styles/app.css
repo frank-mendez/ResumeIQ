@@ -1,4 +1,5 @@
-@import 'tailwindcss' source('../');
+@import "tailwindcss";
+@source "../";
 
 @layer base {
   *,
@@ -13,6 +14,14 @@
 @layer base {
   html {
     color-scheme: light dark;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
   }
 
   * {
