@@ -1,21 +1,19 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from "@supabase/supabase-js";
 
-let browserClient:
-  | ReturnType<typeof createBrowserClient>
-  | undefined
+let browserClient: ReturnType<typeof createClient> | undefined;
 
 export function getSupabaseBrowserClient() {
-  if (browserClient) return browserClient
+  if (browserClient) return browserClient;
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      'Missing VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY env vars. See SETUP.md for configuration.',
-    )
+      "Missing VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY env vars. See SETUP.md for configuration.",
+    );
   }
 
-  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
-  return browserClient
+  browserClient = createClient(supabaseUrl, supabaseAnonKey);
+  return browserClient;
 }

@@ -1,11 +1,13 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
 import { SpinnerIcon } from "~/assets/icons/SpinnerIcon";
+import { getSessionWithRetry } from "~/utils/authSession";
 import { toSafeRedirectPath } from "~/utils/redirect";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
+  code: z.string().optional(),
   redirect: z.string().optional(),
   error: z.string().optional(),
   error_code: z.string().optional(),
@@ -31,6 +33,7 @@ function decodeOrRaw(value: string) {
 
 function AuthCallback() {
   const search = Route.useSearch();
+  const router = useRouter();
   const redirectPath = React.useMemo(
     () => toSafeRedirectPath(search.redirect),
     [search.redirect],
@@ -61,8 +64,24 @@ function AuthCallback() {
           return;
         }
 
-        // Supabase will parse the callback URL and persist the session in cookies/local storage.
-        const { data, error } = await supabase.auth.getSession();
+        // In OAuth code flow, exchange the code in the callback URL for a persisted session.
+        const code =
+          search.code ?? new URL(window.location.href).searchParams.get("code");
+
+        if (code) {
+          const { error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(code);
+
+          if (exchangeError) {
+            if (!cancelled) {
+              setStatus("error");
+              setMessage(exchangeError.message);
+            }
+            return;
+          }
+        }
+
+        const { data, error } = await getSessionWithRetry(supabase);
 
         if (error) {
           if (!cancelled) {
@@ -100,25 +119,26 @@ function AuthCallback() {
           profilePayload.avatar_url = avatarUrl;
         }
 
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert(profilePayload, {
-            onConflict: "id",
-          });
+        const { error: profileError } = await (
+          supabase.from("profiles") as unknown as {
+            upsert: (
+              values: Record<string, unknown>,
+              options: { onConflict: string },
+            ) => Promise<{ error: { message: string } | null }>;
+          }
+        ).upsert(profilePayload as Record<string, unknown>, {
+          onConflict: "id",
+        });
 
         if (profileError) {
-          if (!cancelled) {
-            setStatus("error");
-            setMessage(profileError.message);
-          }
-          return;
+          console.error("Profile upsert error", profileError);
         }
 
         if (cancelled) return;
         setStatus("done");
 
-        // Hard redirect so SSR can pick up the new cookies immediately.
-        window.location.assign(redirectPath);
+        await router.invalidate();
+        await router.navigate({ to: redirectPath, replace: true });
       } catch (err) {
         if (!cancelled) {
           setStatus("error");
@@ -134,7 +154,7 @@ function AuthCallback() {
     return () => {
       cancelled = true;
     };
-  }, [redirectPath, search.error, search.error_description]);
+  }, [redirectPath, router, search.error, search.error_description]);
 
   return (
     <main>

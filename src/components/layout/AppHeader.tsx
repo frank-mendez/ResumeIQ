@@ -1,6 +1,5 @@
 import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import * as React from "react";
-import { logoutServer } from "~/utils/auth.server";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 import { NavLink } from "~/components/layout/NavLink";
 
@@ -16,31 +15,19 @@ export function AppHeader() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const [browserSignOutResult, serverSignOutResult] =
-        await Promise.allSettled([supabase.auth.signOut(), logoutServer()]);
+      const { error } = await supabase.auth.signOut();
 
-      const browserError =
-        browserSignOutResult.status === "fulfilled"
-          ? browserSignOutResult.value.error
-          : browserSignOutResult.reason;
+      if (error) {
+        console.error("Browser sign-out error", error);
 
-      const serverError =
-        serverSignOutResult.status === "rejected"
-          ? serverSignOutResult.reason
-          : null;
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (browserError || serverError) {
-        setSignOutError(
-          "Sign-out completed with warnings. Please log in again if needed.",
-        );
-      }
-
-      if (browserError) {
-        console.error("Browser sign-out error", browserError);
-      }
-
-      if (serverError) {
-        console.error("Server sign-out error", serverError);
+        if (session?.user) {
+          setSignOutError("Sign-out failed. Please try again.");
+          return;
+        }
       }
 
       await router.invalidate();

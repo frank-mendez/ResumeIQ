@@ -5,6 +5,7 @@ import { OAuthButton } from "~/components/auth/OAuthButton";
 import { AuthProviderEnum, AuthProviderType } from "~/types/auth";
 import { toSafeRedirectPath } from "~/utils/redirect";
 import { makeTitle, seo } from "~/utils/seo";
+import { hasSessionUser } from "~/utils/authSession";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
@@ -14,9 +15,23 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
-  beforeLoad: ({ context, search }) => {
+  beforeLoad: async ({ context, search }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const redirectTo = toSafeRedirectPath(search.redirect);
+
     if (context.user) {
-      const redirectTo = toSafeRedirectPath(search.redirect);
+      throw redirect({
+        to: redirectTo,
+      });
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const isAuthenticated = await hasSessionUser(supabase);
+
+    if (isAuthenticated) {
       throw redirect({
         to: redirectTo,
       });

@@ -1,30 +1,37 @@
 /// <reference types="vite/client" />
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import { createServerFn } from "@tanstack/react-start";
 import * as React from "react";
 import { AppHeader } from "~/components/layout/AppHeader";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "~/styles/app.css?url";
+import { getSessionWithRetry } from "~/utils/authSession";
 import { makeTitle, seo } from "~/utils/seo";
-import { getSupabaseServerClient } from "~/utils/supabase.server";
-
-const fetchUser = createServerFn({ method: "POST" }).handler(async () => {
-  const supabase = getSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-
-  if (!data.user) return null;
-
-  return {
-    id: data.user.id,
-    email: data.user.email ?? null,
-  };
-});
+import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 export const Route = createRootRoute({
   beforeLoad: async () => {
-    const user = await fetchUser();
+    if (typeof window === "undefined") {
+      return { user: null };
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await getSessionWithRetry(supabase);
+
+    if (error) {
+      console.error("Failed to load auth session", error);
+      return { user: null };
+    }
+
+    const sessionUser = data.session?.user ?? null;
+    const user = sessionUser
+      ? {
+          id: sessionUser.id,
+          email: sessionUser.email ?? null,
+        }
+      : null;
+
     return { user };
   },
   head: () => ({
@@ -64,12 +71,7 @@ export const Route = createRootRoute({
       { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
       { rel: "icon", href: "/favicon.ico" },
     ],
-    scripts: [
-      {
-        src: "/customScript.js",
-        type: "text/javascript",
-      },
-    ],
+    scripts: [],
   }),
   errorComponent: DefaultCatchBoundary,
   notFoundComponent: () => <NotFound />,

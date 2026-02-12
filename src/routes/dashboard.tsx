@@ -1,14 +1,30 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import * as React from "react";
 import { makeTitle, seo } from "~/utils/seo";
+import { hasSessionUser } from "~/utils/authSession";
+import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 export const Route = createFileRoute("/dashboard")({
-  beforeLoad: ({ context, location }) => {
+  beforeLoad: async ({ context, location }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
     if (!context.user) {
+      const supabase = getSupabaseBrowserClient();
+      const isAuthenticated = await hasSessionUser(supabase);
+
+      if (isAuthenticated) {
+        return;
+      }
+
+      const searchPart =
+        typeof location.search === "string" ? location.search : "";
+
       throw redirect({
         to: "/login",
         search: {
-          redirect: `${location.pathname}${location.search}`,
+          redirect: `${location.pathname}${searchPart}`,
         },
       });
     }
