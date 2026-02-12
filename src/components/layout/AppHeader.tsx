@@ -29,24 +29,22 @@ export function AppHeader() {
           ? serverSignOutResult.reason
           : null;
 
-      await router.invalidate();
-
-      if (!serverError) {
-        await router.navigate({ to: "/login" });
-        return;
+      if (browserError || serverError) {
+        setSignOutError(
+          "Sign-out completed with warnings. Please log in again if needed.",
+        );
       }
-
-      const message =
-        serverError instanceof Error
-          ? serverError.message
-          : "Could not complete secure sign-out. Please try again.";
-
-      setSignOutError(message);
 
       if (browserError) {
         console.error("Browser sign-out error", browserError);
       }
-      console.error("Server sign-out error", serverError);
+
+      if (serverError) {
+        console.error("Server sign-out error", serverError);
+      }
+
+      await router.invalidate();
+      await router.navigate({ to: "/login" });
     } catch (error) {
       const message =
         error instanceof Error
