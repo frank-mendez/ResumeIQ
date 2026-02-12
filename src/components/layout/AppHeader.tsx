@@ -44,7 +44,7 @@ export function AppHeader() {
       }
 
       await router.invalidate();
-      await router.navigate({ to: "/login" });
+      await router.navigate({ to: "/login", replace: true });
     } catch (error) {
       const message =
         error instanceof Error
