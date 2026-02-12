@@ -1,25 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import * as React from "react";
 import { makeTitle, seo } from "~/utils/seo";
+import { hasSessionUser } from "~/utils/authSession";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
-
-async function hasSessionUser(
-  supabase: ReturnType<typeof getSupabaseBrowserClient>,
-) {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (session?.user) {
-      return true;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 120));
-  }
-
-  return false;
-}
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: async ({ context, location }) => {

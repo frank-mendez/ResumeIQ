@@ -2,6 +2,7 @@ import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
 import { SpinnerIcon } from "~/assets/icons/SpinnerIcon";
+import { getSessionWithRetry } from "~/utils/authSession";
 import { toSafeRedirectPath } from "~/utils/redirect";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
@@ -28,26 +29,6 @@ function decodeOrRaw(value: string) {
   } catch {
     return value;
   }
-}
-
-async function waitForSession(
-  supabase: ReturnType<typeof getSupabaseBrowserClient>,
-) {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const { data, error } = await supabase.auth.getSession();
-
-    if (error) {
-      return { data, error };
-    }
-
-    if (data.session) {
-      return { data, error: null };
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 120));
-  }
-
-  return supabase.auth.getSession();
 }
 
 function AuthCallback() {
@@ -100,7 +81,7 @@ function AuthCallback() {
           }
         }
 
-        const { data, error } = await waitForSession(supabase);
+        const { data, error } = await getSessionWithRetry(supabase);
 
         if (error) {
           if (!cancelled) {

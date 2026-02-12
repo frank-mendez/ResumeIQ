@@ -6,6 +6,7 @@ import { AppHeader } from "~/components/layout/AppHeader";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "~/styles/app.css?url";
+import { getSessionWithRetry } from "~/utils/authSession";
 import { makeTitle, seo } from "~/utils/seo";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
@@ -16,7 +17,13 @@ export const Route = createRootRoute({
     }
 
     const supabase = getSupabaseBrowserClient();
-    const { data } = await supabase.auth.getSession();
+    const { data, error } = await getSessionWithRetry(supabase);
+
+    if (error) {
+      console.error("Failed to load auth session", error);
+      return { user: null };
+    }
+
     const sessionUser = data.session?.user ?? null;
     const user = sessionUser
       ? {

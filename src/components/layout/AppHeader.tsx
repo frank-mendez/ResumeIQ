@@ -18,10 +18,16 @@ export function AppHeader() {
       const { error } = await supabase.auth.signOut();
 
       if (error) {
-        setSignOutError(
-          "Sign-out completed with warnings. Please log in again if needed.",
-        );
         console.error("Browser sign-out error", error);
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          setSignOutError("Sign-out failed. Please try again.");
+          return;
+        }
       }
 
       await router.invalidate();

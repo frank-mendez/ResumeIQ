@@ -5,25 +5,8 @@ import { OAuthButton } from "~/components/auth/OAuthButton";
 import { AuthProviderEnum, AuthProviderType } from "~/types/auth";
 import { toSafeRedirectPath } from "~/utils/redirect";
 import { makeTitle, seo } from "~/utils/seo";
+import { hasSessionUser } from "~/utils/authSession";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
-
-async function hasSessionUser(
-  supabase: ReturnType<typeof getSupabaseBrowserClient>,
-) {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (session?.user) {
-      return true;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 120));
-  }
-
-  return false;
-}
 
 const searchSchema = z.object({
   error: z.string().optional(),
