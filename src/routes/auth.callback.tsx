@@ -1,6 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
+import { SpinnerIcon } from "~/assets/icons/SpinnerIcon";
+import { toSafeRedirectPath } from "~/utils/redirect";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
@@ -14,13 +16,6 @@ export const Route = createFileRoute("/auth/callback")({
   validateSearch: (search) => searchSchema.parse(search),
   component: AuthCallback,
 });
-
-function toSafeRedirectPath(raw: string | undefined) {
-  if (!raw) return "/dashboard";
-  if (!raw.startsWith("/")) return "/dashboard";
-  if (raw.startsWith("//")) return "/dashboard";
-  return raw;
-}
 
 function toOptionalString(value: unknown) {
   return typeof value === "string" ? value : null;
@@ -161,7 +156,7 @@ function AuthCallback() {
               </div>
             ) : (
               <div className="mt-6 flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                <Spinner ariaLabel="Completing sign-in" />
+                <SpinnerIcon ariaLabel="Completing sign-in" />
                 <span>Working…</span>
               </div>
             )}
@@ -169,33 +164,5 @@ function AuthCallback() {
         </div>
       </div>
     </main>
-  );
-}
-
-function Spinner({ ariaLabel }: { ariaLabel: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5 animate-spin text-gray-700 dark:text-gray-200"
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        opacity="0.2"
-      />
-      <path
-        d="M22 12a10 10 0 0 1-10 10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
