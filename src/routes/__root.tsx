@@ -10,7 +10,7 @@ import * as React from "react";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "~/styles/app.css?url";
-import { seo } from "~/utils/seo";
+import { makeTitle, seo } from "~/utils/seo";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -23,9 +23,9 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       ...seo({
-        title:
-          "TanStack Start | Type-Safe, Client-First, Full-Stack React Framework",
-        description: `TanStack Start is a type-safe, client-first, full-stack React framework. `,
+        title: makeTitle(),
+        description:
+          "ResumeIQ helps you refine resumes with clear, actionable feedback.",
       }),
     ],
     links: [
@@ -95,16 +95,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 }}
               >
                 Home
-              </Link>
-              <Link
-                to="/posts"
-                className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-white/60 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-950/40 dark:hover:text-gray-100"
-                activeProps={{
-                  className:
-                    "rounded-md px-3 py-2 text-sm font-semibold text-gray-900 bg-white/60 dark:text-gray-100 dark:bg-gray-950/40",
-                }}
-              >
-                Posts
               </Link>
             </nav>
           </div>

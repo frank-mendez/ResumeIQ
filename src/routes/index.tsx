@@ -1,6 +1,16 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { makeTitle, seo } from "~/utils/seo";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      ...seo({
+        title: makeTitle("Home"),
+        description:
+          "ResumeIQ helps you tighten language, improve clarity, and tailor your resume to roles.",
+      }),
+    ],
+  }),
   component: Home,
 });
 
@@ -44,17 +54,6 @@ function Home() {
                 >
                   How it works
                 </a>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  or jump into the demo:
-                </span>
-                <div className="flex items-center gap-3">
-                  <Link
-                    to="/posts"
-                    className="text-sm font-semibold text-blue-700 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Posts
-                  </Link>
-                </div>
               </div>
 
               <dl className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-3">
@@ -266,14 +265,6 @@ function Home() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   This repo includes demo routes you can explore right now.
                 </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  to="/posts"
-                  className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white/60 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-white dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-100 dark:hover:bg-gray-950"
-                >
-                  Browse Posts
-                </Link>
               </div>
             </div>
           </div>
