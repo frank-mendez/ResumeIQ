@@ -24,8 +24,10 @@ jobs:
       - run: npm install
 
       - name: Validate Sonar token
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+          if [ -z "$SONAR_TOKEN" ]; then
             echo "SONAR_TOKEN is missing. Add it in GitHub Settings > Secrets and variables > Actions." >&2
             exit 1
           fi

@@ -19,3 +19,5 @@ dist
 /blob-report/
 /playwright/.cache/
 .tanstack
+.sonarlint/
+.vscode/

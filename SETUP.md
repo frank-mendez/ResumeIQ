@@ -225,6 +225,26 @@ In SonarCloud project settings, configure your quality gate so pull requests fai
 
 The GitHub Action waits for quality gate status (`sonar.qualitygate.wait=true`), so failing gates fail CI checks on PRs and `main` pushes.
 
+### 5.3.4 SonarLint Connected Mode (Per Developer)
+
+Do not commit user-specific SonarLint connected mode values (`connectionId`, `projectKey`) to shared workspace settings.
+
+Configure connected mode locally in your own VS Code settings:
+
+```jsonc
+{
+  "sonarlint.connectedMode.project": {
+    "connectionId": "<your-sonarcloud-connection-id>",
+    "projectKey": "frank-mendez_ResumeIQ",
+  },
+}
+```
+
+Recommended locations:
+
+- VS Code User Settings (preferred), or
+- Local workspace settings that you do not commit.
+
 ## Step 6: Enable AI Analysis (Optional)
 
 To enable actual AI resume analysis:
