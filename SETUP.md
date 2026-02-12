@@ -191,6 +191,60 @@ The application will be available at: http://localhost:3000
 5. **Upload**: Try uploading a test PDF or DOCX file
 6. **Pricing**: View the pricing plans
 
+## Step 5.3: SonarCloud (Continuous Code Quality)
+
+ResumeIQ includes SonarCloud CI scanning via `.github/workflows/sonar.yml` and root config via `sonar-project.properties`.
+
+### 5.3.1 Create SonarCloud Project
+
+1. Sign in to https://sonarcloud.io
+2. Import and connect your GitHub repository
+3. Copy the generated values for:
+
+- `sonar.projectKey`
+- `sonar.organization`
+
+4. Update those values in `sonar-project.properties`
+
+### 5.3.2 Add GitHub Secret
+
+1. In GitHub, open **Settings → Secrets and variables → Actions**
+2. Create a new repository secret:
+
+- Name: `SONAR_TOKEN`
+- Value: token from SonarCloud (**My Account → Security → Generate Tokens**)
+
+### 5.3.3 Configure Quality Gate
+
+In SonarCloud project settings, configure your quality gate so pull requests fail when code quality regresses. Minimum recommended rules:
+
+- No new critical issues
+- No new security vulnerabilities
+- Code duplication threshold enforced
+- Coverage threshold (optional for MVP)
+
+The GitHub Action waits for quality gate status (`sonar.qualitygate.wait=true`), so failing gates fail CI checks on PRs and `main` pushes.
+
+### 5.3.4 SonarLint Connected Mode (Per Developer)
+
+Do not commit user-specific SonarLint connected mode values (`connectionId`, `projectKey`) to shared workspace settings.
+
+Configure connected mode locally in your own VS Code settings:
+
+```jsonc
+{
+  "sonarlint.connectedMode.project": {
+    "connectionId": "<your-sonarcloud-connection-id>",
+    "projectKey": "frank-mendez_ResumeIQ",
+  },
+}
+```
+
+Recommended locations:
+
+- VS Code User Settings (preferred), or
+- Local workspace settings that you do not commit.
+
 ## Step 6: Enable AI Analysis (Optional)
 
 To enable actual AI resume analysis:
