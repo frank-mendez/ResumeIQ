@@ -2,26 +2,58 @@ import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import * as React from "react";
 import { logoutServer } from "~/utils/auth.server";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
+import { NavLink } from "~/components/layout/NavLink";
 
 export function AppHeader() {
   const { user } = useRouteContext({ from: "__root__" });
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = React.useState(false);
+  const [signOutError, setSignOutError] = React.useState<string | null>(null);
 
   const handleSignOut = React.useCallback(async () => {
     setIsSigningOut(true);
+    setSignOutError(null);
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.auth.signOut();
+      const [browserSignOutResult, serverSignOutResult] =
+        await Promise.allSettled([supabase.auth.signOut(), logoutServer()]);
 
-      if (error) {
-        throw new Error(error.message);
+      const browserError =
+        browserSignOutResult.status === "fulfilled"
+          ? browserSignOutResult.value.error
+          : browserSignOutResult.reason;
+
+      const serverError =
+        serverSignOutResult.status === "rejected"
+          ? serverSignOutResult.reason
+          : null;
+
+      await router.invalidate();
+
+      if (!serverError) {
+        await router.navigate({ to: "/login" });
+        return;
       }
 
-      await logoutServer();
-      await router.invalidate();
-      await router.navigate({ to: "/login" });
+      const message =
+        serverError instanceof Error
+          ? serverError.message
+          : "Could not complete secure sign-out. Please try again.";
+
+      setSignOutError(message);
+
+      if (browserError) {
+        console.error("Browser sign-out error", browserError);
+      }
+      console.error("Server sign-out error", serverError);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not complete sign-out. Please try again.";
+      setSignOutError(message);
+      console.error("Unexpected sign-out error", error);
     } finally {
       setIsSigningOut(false);
     }
@@ -44,6 +76,14 @@ export function AppHeader() {
         </div>
 
         <nav aria-label="Primary" className="flex items-center gap-1">
+          {signOutError ? (
+            <span
+              role="alert"
+              className="mr-2 text-xs text-rose-700 dark:text-rose-300"
+            >
+              {signOutError}
+            </span>
+          ) : null}
           <NavLink to="/" label="Home" exact />
           {user ? (
             <button
@@ -60,29 +100,5 @@ export function AppHeader() {
         </nav>
       </div>
     </header>
-  );
-}
-
-function NavLink({
-  to,
-  label,
-  exact,
-}: {
-  to: string;
-  label: string;
-  exact?: boolean;
-}) {
-  return (
-    <Link
-      to={to}
-      activeOptions={{ exact: Boolean(exact) }}
-      className="rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-white/60 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-950/40 dark:hover:text-gray-100"
-      activeProps={{
-        className:
-          "rounded-md px-3 py-2 text-sm font-semibold text-gray-900 bg-white/60 dark:text-gray-100 dark:bg-gray-950/40",
-      }}
-    >
-      {label}
-    </Link>
   );
 }
