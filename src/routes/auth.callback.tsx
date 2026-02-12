@@ -21,6 +21,14 @@ function toOptionalString(value: unknown) {
   return typeof value === "string" ? value : null;
 }
 
+function decodeOrRaw(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function AuthCallback() {
   const search = Route.useSearch();
   const redirectPath = React.useMemo(
@@ -43,7 +51,7 @@ function AuthCallback() {
         // If the provider redirected back with an error, surface it.
         if (search.error || search.error_description) {
           const desc = search.error_description
-            ? decodeURIComponent(search.error_description)
+            ? decodeOrRaw(search.error_description)
             : undefined;
 
           if (!cancelled) {
@@ -76,16 +84,27 @@ function AuthCallback() {
         const fullName = toOptionalString(user.user_metadata?.full_name);
         const avatarUrl = toOptionalString(user.user_metadata?.avatar_url);
 
-        const { error: profileError } = await supabase.from("profiles").upsert(
-          {
-            id: user.id,
-            full_name: fullName,
-            avatar_url: avatarUrl,
-          },
-          {
+        const profilePayload: {
+          id: string;
+          full_name?: string;
+          avatar_url?: string;
+        } = {
+          id: user.id,
+        };
+
+        if (fullName !== null) {
+          profilePayload.full_name = fullName;
+        }
+
+        if (avatarUrl !== null) {
+          profilePayload.avatar_url = avatarUrl;
+        }
+
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert(profilePayload, {
             onConflict: "id",
-          },
-        );
+          });
 
         if (profileError) {
           if (!cancelled) {

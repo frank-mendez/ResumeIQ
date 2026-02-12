@@ -36,7 +36,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
-  const { error: routeError, redirect } = Route.useSearch();
+  const { error: routeError, redirect: redirectParam } = Route.useSearch();
   const [loadingProvider, setLoadingProvider] =
     React.useState<AuthProviderType | null>(null);
   const [localError, setLocalError] = React.useState<string | null>(null);
@@ -55,8 +55,8 @@ function Login() {
     localError ?? (!dismissedRouteError ? decodedRouteError : null);
 
   const safeRedirectPath = React.useMemo(
-    () => toSafeRedirectPath(redirect),
-    [redirect],
+    () => toSafeRedirectPath(redirectParam),
+    [redirectParam],
   );
 
   const startOAuth = React.useCallback(
