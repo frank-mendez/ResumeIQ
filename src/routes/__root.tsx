@@ -1,14 +1,32 @@
 /// <reference types="vite/client" />
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { createServerFn } from "@tanstack/react-start";
 import * as React from "react";
 import { AppHeader } from "~/components/AppHeader";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "~/styles/app.css?url";
 import { makeTitle, seo } from "~/utils/seo";
+import { getSupabaseServerClient } from "~/utils/supabase.server";
+
+const fetchUser = createServerFn({ method: "GET" }).handler(async () => {
+  const supabase = getSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
+
+  if (!data.user) return null;
+
+  return {
+    id: data.user.id,
+    email: data.user.email ?? null,
+  };
+});
 
 export const Route = createRootRoute({
+  beforeLoad: async () => {
+    const user = await fetchUser();
+    return { user };
+  },
   head: () => ({
     meta: [
       {

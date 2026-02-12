@@ -1,16 +1,29 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
 import { makeTitle, seo } from "~/utils/seo";
+import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
   error: z.string().optional(),
+  redirect: z.string().optional(),
 });
 
 type Provider = "google" | "github";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
+  beforeLoad: ({ context, search }) => {
+    if (context.user) {
+      const redirectTo =
+        search.redirect && search.redirect.startsWith("/")
+          ? search.redirect
+          : "/dashboard";
+      throw redirect({
+        to: redirectTo,
+      });
+    }
+  },
   head: () => ({
     meta: [
       ...seo({
@@ -23,7 +36,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
-  const { error: routeError } = Route.useSearch();
+  const { error: routeError, redirect } = Route.useSearch();
   const [loadingProvider, setLoadingProvider] = React.useState<Provider | null>(
     null,
   );
@@ -42,18 +55,47 @@ function Login() {
   const errorMessage =
     localError ?? (!dismissedRouteError ? decodedRouteError : null);
 
-  const startOAuth = React.useCallback((provider: Provider) => {
-    setLocalError(null);
-    setLoadingProvider(provider);
+  const safeRedirectPath = React.useMemo(() => {
+    if (!redirect) return "/dashboard";
+    // Only allow same-origin relative redirects.
+    if (!redirect.startsWith("/")) return "/dashboard";
+    if (redirect.startsWith("//")) return "/dashboard";
+    return redirect;
+  }, [redirect]);
 
-    // UI-only: simulate a request/redirect flow.
-    window.setTimeout(() => {
-      setLoadingProvider(null);
-      setLocalError(
-        "OAuth isn’t wired up yet. This page is UI-only — connect your auth provider to enable sign-in.",
-      );
-    }, 900);
-  }, []);
+  const startOAuth = React.useCallback(
+    async (provider: Provider) => {
+      setLocalError(null);
+      setLoadingProvider(provider);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+
+        const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
+          safeRedirectPath,
+        )}`;
+
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+          },
+        });
+
+        if (error) {
+          setLocalError(error.message);
+          setLoadingProvider(null);
+        }
+        // On success, Supabase redirects the browser away from this page.
+      } catch (err) {
+        setLocalError(
+          err instanceof Error ? err.message : "Failed to start OAuth",
+        );
+        setLoadingProvider(null);
+      }
+    },
+    [safeRedirectPath],
+  );
 
   return (
     <main>
@@ -109,7 +151,7 @@ function Login() {
             </div>
 
             <p className="mt-6 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-              This is a UI-only page — authentication isn’t connected.
+              You’ll be redirected to your provider to finish signing in.
             </p>
           </div>
         </div>
