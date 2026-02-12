@@ -23,6 +23,9 @@ jobs:
 
       - run: npm install
 
+      - name: Build and typecheck
+        run: npm run build
+
       - name: Validate Sonar token
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
