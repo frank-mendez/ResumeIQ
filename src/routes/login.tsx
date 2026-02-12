@@ -7,6 +7,24 @@ import { toSafeRedirectPath } from "~/utils/redirect";
 import { makeTitle, seo } from "~/utils/seo";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
+async function hasSessionUser(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.user) {
+      return true;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
+  return false;
+}
+
 const searchSchema = z.object({
   error: z.string().optional(),
   redirect: z.string().optional(),
@@ -14,9 +32,19 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
-  beforeLoad: ({ context, search }) => {
+  beforeLoad: async ({ context, search }) => {
+    const redirectTo = toSafeRedirectPath(search.redirect);
+
     if (context.user) {
-      const redirectTo = toSafeRedirectPath(search.redirect);
+      throw redirect({
+        to: redirectTo,
+      });
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const isAuthenticated = await hasSessionUser(supabase);
+
+    if (isAuthenticated) {
       throw redirect({
         to: redirectTo,
       });
