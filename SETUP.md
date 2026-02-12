@@ -41,6 +41,20 @@ npm install
    - **anon public** key
    - **service_role** key (secret)
 
+### 2.2.1 Enable OAuth Providers (Google + GitHub)
+
+In your Supabase project dashboard:
+
+1. Go to **Authentication** → **Providers**
+2. Enable **Google** and **GitHub**
+3. Follow Supabase’s OAuth setup guide for each provider
+4. Set your redirect URLs in **Authentication** → **URL Configuration**:
+
+- **Site URL**: `http://localhost:3000` (dev)
+- **Redirect URLs**: add `http://localhost:3000/auth/callback`
+
+When you deploy, add your production site URL and production callback URL too.
+
 ### 2.3 Run Database Migrations
 
 1. Open the SQL Editor in your Supabase dashboard
@@ -53,12 +67,14 @@ npm install
 ### 2.4 Verify Database Setup
 
 Check that the following tables were created:
+
 - `resumes`
 - `analyses`
 - `subscriptions`
 - `payments`
 
 Check that the storage bucket was created:
+
 - `resumes` (private bucket)
 
 ## Step 3: Stripe Setup
@@ -98,18 +114,18 @@ Edit `app/lib/stripe.server.ts`:
 export const STRIPE_PLANS = {
   // ...
   PRO: {
-    name: 'Pro',
+    name: "Pro",
     price: 1999,
-    priceId: 'price_YOUR_PRO_PRICE_ID', // <-- Update this
+    priceId: "price_YOUR_PRO_PRICE_ID", // <-- Update this
     // ...
   },
   ENTERPRISE: {
-    name: 'Enterprise',
+    name: "Enterprise",
     price: 9999,
-    priceId: 'price_YOUR_ENTERPRISE_PRICE_ID', // <-- Update this
+    priceId: "price_YOUR_ENTERPRISE_PRICE_ID", // <-- Update this
     // ...
   },
-}
+};
 ```
 
 ### 3.5 Set Up Webhook (After Deployment)
@@ -134,7 +150,6 @@ Edit `.env` and replace the placeholder values:
 # Supabase (from Step 2.2)
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 # Stripe (from Step 3.2)
 STRIPE_SECRET_KEY=sk_test_your_secret_key
@@ -149,6 +164,7 @@ VITE_APP_URL=http://localhost:3000
 ```
 
 **Important Notes:**
+
 - Use **test mode** keys (`sk_test_`, `pk_test_`) for development
 - Use **live mode** keys for production
 - Never commit the `.env` file to version control
@@ -202,11 +218,11 @@ Edit `app/utils/resume.server.ts` in the `analyzeResume` function.
 Replace the stubbed implementation with actual OpenAI API calls:
 
 ```typescript
-import OpenAI from 'openai'
+import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
-})
+});
 
 const completion = await openai.chat.completions.create({
   model: "gpt-4",
@@ -220,17 +236,17 @@ const completion = await openai.chat.completions.create({
 4. Actionable suggestions for improvement
 5. Key skills and keywords found
 
-Return your analysis in JSON format.`
+Return your analysis in JSON format.`,
     },
     {
       role: "user",
-      content: resume.extracted_text!
-    }
+      content: resume.extracted_text!,
+    },
   ],
-  response_format: { type: "json_object" }
-})
+  response_format: { type: "json_object" },
+});
 
-const analysis = JSON.parse(completion.choices[0].message.content!)
+const analysis = JSON.parse(completion.choices[0].message.content!);
 // Use the analysis data
 ```
 
@@ -243,40 +259,43 @@ To extract text from actual PDF and DOCX files:
 Edit `app/utils/resume.server.ts` in the `extractResumeText` function:
 
 ```typescript
-import pdf from 'pdf-parse'
-import mammoth from 'mammoth'
+import pdf from "pdf-parse";
+import mammoth from "mammoth";
 
 // Download file from Supabase Storage
 const { data: fileData, error: downloadError } = await supabase.storage
-  .from('resumes')
-  .download(resume.file_path)
+  .from("resumes")
+  .download(resume.file_path);
 
 if (downloadError) {
-  throw new Error('Failed to download file')
+  throw new Error("Failed to download file");
 }
 
-let extractedText = ''
+let extractedText = "";
 
 // Extract based on file type
-if (resume.file_type.includes('pdf')) {
-  const buffer = Buffer.from(await fileData.arrayBuffer())
-  const data = await pdf(buffer)
-  extractedText = data.text
-} else if (resume.file_type.includes('docx') || resume.file_type.includes('document')) {
-  const buffer = Buffer.from(await fileData.arrayBuffer())
-  const result = await mammoth.extractRawText({ buffer })
-  extractedText = result.value
+if (resume.file_type.includes("pdf")) {
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const data = await pdf(buffer);
+  extractedText = data.text;
+} else if (
+  resume.file_type.includes("docx") ||
+  resume.file_type.includes("document")
+) {
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const result = await mammoth.extractRawText({ buffer });
+  extractedText = result.value;
 } else {
-  throw new Error('Unsupported file type')
+  throw new Error("Unsupported file type");
 }
 
 // Update resume with extracted text
 await supabase
-  .from('resumes')
+  .from("resumes")
   .update({ extracted_text: extractedText })
-  .eq('id', data.resumeId)
+  .eq("id", data.resumeId);
 
-return { text: extractedText }
+return { text: extractedText };
 ```
 
 ## Step 8: Production Deployment
@@ -290,16 +309,19 @@ npm run build
 ### 8.2 Deploy to Vercel (Recommended)
 
 1. Install Vercel CLI:
+
    ```bash
    npm i -g vercel
    ```
 
 2. Login to Vercel:
+
    ```bash
    vercel login
    ```
 
 3. Deploy:
+
    ```bash
    vercel
    ```
@@ -311,23 +333,27 @@ npm run build
 ### 8.3 Deploy to Other Platforms
 
 **Netlify:**
+
 ```bash
 npm run build
 netlify deploy --prod
 ```
 
 **Railway:**
+
 ```bash
 railway up
 ```
 
 **Self-hosted:**
+
 ```bash
 npm run build
 npm run start
 ```
 
 Use a process manager like PM2:
+
 ```bash
 npm i -g pm2
 pm2 start npm --name "resumeiq" -- start

@@ -1,16 +1,27 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
+import { OAuthButton } from "~/components/auth/OAuthButton";
+import { AuthProviderEnum, AuthProviderType } from "~/types/auth";
+import { toSafeRedirectPath } from "~/utils/redirect";
 import { makeTitle, seo } from "~/utils/seo";
+import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
   error: z.string().optional(),
+  redirect: z.string().optional(),
 });
-
-type Provider = "google" | "github";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
+  beforeLoad: ({ context, search }) => {
+    if (context.user) {
+      const redirectTo = toSafeRedirectPath(search.redirect);
+      throw redirect({
+        to: redirectTo,
+      });
+    }
+  },
   head: () => ({
     meta: [
       ...seo({
@@ -23,10 +34,9 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
-  const { error: routeError } = Route.useSearch();
-  const [loadingProvider, setLoadingProvider] = React.useState<Provider | null>(
-    null,
-  );
+  const { error: routeError, redirect: redirectParam } = Route.useSearch();
+  const [loadingProvider, setLoadingProvider] =
+    React.useState<AuthProviderType | null>(null);
   const [localError, setLocalError] = React.useState<string | null>(null);
   const [dismissedRouteError, setDismissedRouteError] = React.useState(false);
 
@@ -42,18 +52,44 @@ function Login() {
   const errorMessage =
     localError ?? (!dismissedRouteError ? decodedRouteError : null);
 
-  const startOAuth = React.useCallback((provider: Provider) => {
-    setLocalError(null);
-    setLoadingProvider(provider);
+  const safeRedirectPath = React.useMemo(
+    () => toSafeRedirectPath(redirectParam),
+    [redirectParam],
+  );
 
-    // UI-only: simulate a request/redirect flow.
-    window.setTimeout(() => {
-      setLoadingProvider(null);
-      setLocalError(
-        "OAuth isn’t wired up yet. This page is UI-only — connect your auth provider to enable sign-in.",
-      );
-    }, 900);
-  }, []);
+  const startOAuth = React.useCallback(
+    async (provider: AuthProviderType) => {
+      setLocalError(null);
+      setLoadingProvider(provider);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+
+        const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
+          safeRedirectPath,
+        )}`;
+
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+          },
+        });
+
+        if (error) {
+          setLocalError(error.message);
+          setLoadingProvider(null);
+        }
+        // On success, Supabase redirects the browser away from this page.
+      } catch (err) {
+        setLocalError(
+          err instanceof Error ? err.message : "Failed to start OAuth",
+        );
+        setLoadingProvider(null);
+      }
+    },
+    [safeRedirectPath],
+  );
 
   return (
     <main>
@@ -93,124 +129,27 @@ function Login() {
 
             <div className="mt-6 space-y-3">
               <OAuthButton
-                provider="google"
+                provider={AuthProviderEnum.GOOGLE}
                 label="Continue with Google"
-                loading={loadingProvider === "google"}
+                loading={loadingProvider === AuthProviderEnum.GOOGLE}
                 disabled={loadingProvider !== null}
-                onClick={() => startOAuth("google")}
+                onClick={() => startOAuth(AuthProviderEnum.GOOGLE)}
               />
               <OAuthButton
-                provider="github"
+                provider={AuthProviderEnum.GITHUB}
                 label="Continue with GitHub"
-                loading={loadingProvider === "github"}
+                loading={loadingProvider === AuthProviderEnum.GITHUB}
                 disabled={loadingProvider !== null}
-                onClick={() => startOAuth("github")}
+                onClick={() => startOAuth(AuthProviderEnum.GITHUB)}
               />
             </div>
 
             <p className="mt-6 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-              This is a UI-only page — authentication isn’t connected.
+              You’ll be redirected to your provider to finish signing in.
             </p>
           </div>
         </div>
       </div>
     </main>
-  );
-}
-
-function OAuthButton({
-  provider,
-  label,
-  loading,
-  disabled,
-  onClick,
-}: {
-  provider: Provider;
-  label: string;
-  loading: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex w-full items-center justify-center gap-3 rounded-md border border-gray-200 bg-white/70 px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-100 dark:hover:bg-gray-950"
-    >
-      {loading ? (
-        <Spinner ariaLabel={`Loading ${provider}`} />
-      ) : provider === "google" ? (
-        <GoogleMark aria-hidden="true" className="h-5 w-5" />
-      ) : (
-        <GitHubMark aria-hidden="true" className="h-5 w-5" />
-      )}
-      <span>{loading ? "Working…" : label}</span>
-    </button>
-  );
-}
-
-function Spinner({ ariaLabel }: { ariaLabel: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5 animate-spin text-gray-700 dark:text-gray-200"
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        opacity="0.2"
-      />
-      <path
-        d="M22 12a10 10 0 0 1-10 10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function GoogleMark(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" {...props}>
-      <circle
-        cx="12"
-        cy="12"
-        r="9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        opacity="0.7"
-      />
-      <text
-        x="12"
-        y="16"
-        textAnchor="middle"
-        fontSize="12"
-        fontWeight="700"
-        fill="currentColor"
-      >
-        G
-      </text>
-    </svg>
-  );
-}
-
-function GitHubMark(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" {...props}>
-      <path
-        fill="currentColor"
-        d="M12 2.4c-5.3 0-9.6 4.3-9.6 9.6 0 4.3 2.8 8 6.7 9.3.5.1.7-.2.7-.5v-1.8c-2.7.6-3.2-1.1-3.2-1.1-.5-1.2-1.1-1.6-1.1-1.6-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .8.1-.7.4-1.1.6-1.3-2.2-.2-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.2-.4-1.3.1-2.7 0 0 .8-.2 2.7 1a9.4 9.4 0 0 1 4.9 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.5.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7 1 .7 2v3c0 .3.2.6.7.5a9.6 9.6 0 0 0 6.7-9.3c0-5.3-4.3-9.6-9.6-9.6z"
-      />
-    </svg>
   );
 }
