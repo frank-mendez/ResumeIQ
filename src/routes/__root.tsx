@@ -11,6 +11,10 @@ import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 export const Route = createRootRoute({
   beforeLoad: async () => {
+    if (typeof window === "undefined") {
+      return { user: null };
+    }
+
     const supabase = getSupabaseBrowserClient();
     const { data } = await supabase.auth.getSession();
     const sessionUser = data.session?.user ?? null;

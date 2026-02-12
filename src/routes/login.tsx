@@ -33,6 +33,10 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
   beforeLoad: async ({ context, search }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
     const redirectTo = toSafeRedirectPath(search.redirect);
 
     if (context.user) {

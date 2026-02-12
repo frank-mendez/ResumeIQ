@@ -23,6 +23,10 @@ async function hasSessionUser(
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: async ({ context, location }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
     if (!context.user) {
       const supabase = getSupabaseBrowserClient();
       const isAuthenticated = await hasSessionUser(supabase);
