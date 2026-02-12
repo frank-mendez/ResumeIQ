@@ -11,14 +11,18 @@ const searchSchema = z.object({
 
 type Provider = "google" | "github";
 
+function toSafeRedirectPath(raw: string | undefined) {
+  if (!raw) return "/dashboard";
+  if (!raw.startsWith("/")) return "/dashboard";
+  if (raw.startsWith("//")) return "/dashboard";
+  return raw;
+}
+
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
   beforeLoad: ({ context, search }) => {
     if (context.user) {
-      const redirectTo =
-        search.redirect && search.redirect.startsWith("/")
-          ? search.redirect
-          : "/dashboard";
+      const redirectTo = toSafeRedirectPath(search.redirect);
       throw redirect({
         to: redirectTo,
       });
@@ -55,13 +59,10 @@ function Login() {
   const errorMessage =
     localError ?? (!dismissedRouteError ? decodedRouteError : null);
 
-  const safeRedirectPath = React.useMemo(() => {
-    if (!redirect) return "/dashboard";
-    // Only allow same-origin relative redirects.
-    if (!redirect.startsWith("/")) return "/dashboard";
-    if (redirect.startsWith("//")) return "/dashboard";
-    return redirect;
-  }, [redirect]);
+  const safeRedirectPath = React.useMemo(
+    () => toSafeRedirectPath(redirect),
+    [redirect],
+  );
 
   const startOAuth = React.useCallback(
     async (provider: Provider) => {

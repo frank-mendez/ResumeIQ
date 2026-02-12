@@ -150,9 +150,6 @@ Edit `.env` and replace the placeholder values:
 # Supabase (from Step 2.2)
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 # Stripe (from Step 3.2)
 STRIPE_SECRET_KEY=sk_test_your_secret_key

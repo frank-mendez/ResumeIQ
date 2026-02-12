@@ -22,6 +22,10 @@ function toSafeRedirectPath(raw: string | undefined) {
   return raw;
 }
 
+function toOptionalString(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
 function AuthCallback() {
   const search = Route.useSearch();
   const redirectPath = React.useMemo(
@@ -69,6 +73,29 @@ function AuthCallback() {
           if (!cancelled) {
             setStatus("error");
             setMessage("No session found after OAuth redirect.");
+          }
+          return;
+        }
+
+        const user = data.session.user;
+        const fullName = toOptionalString(user.user_metadata?.full_name);
+        const avatarUrl = toOptionalString(user.user_metadata?.avatar_url);
+
+        const { error: profileError } = await supabase.from("profiles").upsert(
+          {
+            id: user.id,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+          },
+          {
+            onConflict: "id",
+          },
+        );
+
+        if (profileError) {
+          if (!cancelled) {
+            setStatus("error");
+            setMessage(profileError.message);
           }
           return;
         }
