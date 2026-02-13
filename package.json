@@ -11,7 +11,7 @@
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "lint:staged": "lint-staged",
-    "test": "vitest run --coverage",
+    "test": "vitest run",
     "test:watch": "vitest",
     "database:login": "npx supabase login",
     "database:init": "npx supabase init",
