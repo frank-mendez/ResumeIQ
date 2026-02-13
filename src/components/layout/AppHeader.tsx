@@ -69,7 +69,7 @@ export function AppHeader() {
               {signOutError}
             </span>
           ) : null}
-          <NavLink to="/" label="Home" exact />
+          <NavLink to="/dashboard" label="Dashboard" exact />
           {user ? (
             <button
               type="button"

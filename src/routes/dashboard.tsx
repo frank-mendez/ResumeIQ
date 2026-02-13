@@ -1,33 +1,21 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { makeTitle, seo } from "~/utils/seo";
-import { hasSessionUser } from "~/utils/authSession";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
+import { requireDashboardAuth } from "~/utils/routeAuth";
+
+type ResumeListItem = {
+  id: string;
+  original_filename: string;
+  created_at: string | null;
+};
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: async ({ context, location }) => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (!context.user) {
-      const supabase = getSupabaseBrowserClient();
-      const isAuthenticated = await hasSessionUser(supabase);
-
-      if (isAuthenticated) {
-        return;
-      }
-
-      const searchPart =
-        typeof location.search === "string" ? location.search : "";
-
-      throw redirect({
-        to: "/login",
-        search: {
-          redirect: `${location.pathname}${searchPart}`,
-        },
-      });
-    }
+    await requireDashboardAuth({
+      location,
+      hasKnownUser: Boolean(context.user),
+    });
   },
   head: () => ({
     meta: [
@@ -41,7 +29,13 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
+  const { user } = Route.useRouteContext();
   const [pickedFileName, setPickedFileName] = React.useState<string | null>(
+    null,
+  );
+  const [resumes, setResumes] = React.useState<Array<ResumeListItem>>([]);
+  const [isLoadingResumes, setIsLoadingResumes] = React.useState(true);
+  const [resumeLoadError, setResumeLoadError] = React.useState<string | null>(
     null,
   );
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -49,6 +43,59 @@ function Dashboard() {
   const openPicker = React.useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadResumes = async () => {
+      if (!user?.id) {
+        if (!cancelled) {
+          setResumes([]);
+          setIsLoadingResumes(false);
+        }
+        return;
+      }
+
+      setIsLoadingResumes(true);
+      setResumeLoadError(null);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data, error } = await supabase
+          .from("resumes")
+          .select("id, original_filename, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        if (!cancelled) {
+          setResumes((data ?? []) as Array<ResumeListItem>);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Unable to load resumes right now.";
+          setResumeLoadError(message);
+          setResumes([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingResumes(false);
+        }
+      }
+    };
+
+    loadResumes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   return (
     <main>
@@ -131,7 +178,11 @@ function Dashboard() {
               aria-label="Overview"
               className="grid gap-4 lg:grid-cols-2"
             >
-              <EmptyStateCard />
+              <ResumeListCard
+                resumes={resumes}
+                isLoading={isLoadingResumes}
+                loadError={resumeLoadError}
+              />
               <QuickActionsCard onUpload={openPicker} />
             </section>
 
@@ -175,7 +226,35 @@ function Dashboard() {
   );
 }
 
-function EmptyStateCard() {
+function formatUploadDate(value: string | null) {
+  if (!value) {
+    return "Unknown date";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function ResumeListCard({
+  resumes,
+  isLoading,
+  loadError,
+}: Readonly<{
+  resumes: Array<ResumeListItem>;
+  isLoading: boolean;
+  loadError: string | null;
+}>) {
+  const isEmpty = !isLoading && !loadError && resumes.length === 0;
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white/60 p-6 dark:border-gray-800 dark:bg-gray-950/40">
       <div className="flex items-start justify-between gap-4">
@@ -186,21 +265,62 @@ function EmptyStateCard() {
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200">
-          Empty
+          {isLoading ? "Loading" : resumes.length}
         </span>
       </div>
 
-      <div className="mt-5 rounded-xl border border-dashed border-gray-300 bg-white/40 p-5 dark:border-gray-700 dark:bg-gray-950/20">
-        <p className="text-sm font-semibold">No resumes yet</p>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Upload your first resume to start receiving feedback.
-        </p>
-      </div>
+      {isLoading ? (
+        <div className="mt-5 rounded-xl border border-gray-200 bg-white/40 p-5 dark:border-gray-800 dark:bg-gray-950/20">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Loading your resumes...
+          </p>
+        </div>
+      ) : null}
+
+      {!isLoading && loadError ? (
+        <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900/50 dark:bg-rose-950/20">
+          <p className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+            Could not load resumes
+          </p>
+          <p className="mt-1 text-sm text-rose-800 dark:text-rose-300">
+            {loadError}
+          </p>
+        </div>
+      ) : null}
+
+      {isEmpty ? (
+        <div className="mt-5 rounded-xl border border-dashed border-gray-300 bg-white/40 p-5 dark:border-gray-700 dark:bg-gray-950/20">
+          <p className="text-sm font-semibold">No resumes yet</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Upload your first resume to start receiving feedback.
+          </p>
+        </div>
+      ) : null}
+
+      {!isLoading && !loadError && resumes.length > 0 ? (
+        <ul className="mt-5 space-y-2" aria-label="Uploaded resumes">
+          {resumes.map((resume) => (
+            <li key={resume.id}>
+              <a
+                href={`/dashboard/${resume.id}`}
+                className="block rounded-xl border border-gray-200 bg-white/70 p-4 hover:bg-white dark:border-gray-800 dark:bg-gray-950/40 dark:hover:bg-gray-950"
+              >
+                <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {resume.original_filename}
+                </p>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                  Uploaded {formatUploadDate(resume.created_at)}
+                </p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
 
-function QuickActionsCard({ onUpload }: { onUpload: () => void }) {
+function QuickActionsCard({ onUpload }: Readonly<{ onUpload: () => void }>) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white/60 p-6 dark:border-gray-800 dark:bg-gray-950/40">
       <h2 className="text-lg font-semibold tracking-tight">Quick start</h2>

@@ -80,7 +80,10 @@ function Login() {
       try {
         const supabase = getSupabaseBrowserClient();
 
-        const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
+        const oauthBaseUrl = import.meta.env.DEV
+          ? "http://localhost:3000"
+          : globalThis.location.origin;
+        const redirectTo = `${oauthBaseUrl}/auth/callback?redirect=${encodeURIComponent(
           safeRedirectPath,
         )}`;
 
