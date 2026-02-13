@@ -1,151 +1,224 @@
-# ResumeIQ
+# 🚀 ResumeIQ
 
-ResumeIQ shows how your resume performs in ATS systems and tells you exactly how to fix it.
+AI-powered resume analysis platform designed to help candidates optimize their resumes for Applicant Tracking Systems (ATS) and recruiter expectations.
 
-## Product Scope (MVP Is)
+Built with modern SaaS architecture using Supabase, AI integrations, and secure database design.
 
-ResumeIQ is a paid, ATS-focused resume analyzer that:
+## ✨ Features
 
-- Accepts a resume upload
-- Analyzes it using ChatGPT
-- Returns an honest ATS score plus actionable feedback
-- Converts users via a 7-day low-friction trial
+- 🔐 Supabase Authentication (JWT-based)
+- 📄 Resume Upload (PDF/DOCX)
+- 🗂 Versioned Resume System
+- 🤖 AI-Powered Resume Analysis
+- 📊 Structured ATS Scoring
+- 💳 Stripe Subscription Support (planned / in progress)
+- 💰 Usage & Credit Tracking
+- 🔒 Row-Level Security (RLS) enforced
+- 🧪 Unit Testing with Coverage Enforcement
+- ☁️ SonarCloud Quality Gate CI
 
-This is not a resume builder. This is diagnosis plus improvement guidance.
+## 🏗 Architecture Overview
 
-## Locked Tech Stack (MVP)
+Frontend (React + TanStack Router)  
+↓  
+Supabase Auth + Storage  
+↓  
+Supabase Postgres (RLS enforced)  
+↓  
+Backend API (AI + Billing Logic)  
+↓  
+OpenAI / Stripe
 
-- Frontend / Backend: TanStack Start
-- Auth and DB: Supabase (OAuth + Postgres + Storage)
-- Styling: Tailwind CSS
-- LLM Provider: ChatGPT (via OpenAI)
-- Payments: Stripe
+### Principles
 
-No framework swaps. No client-side AI.
+- No direct DB exposure
+- RLS on every table
+- Backend handles billing + AI secrets
+- Deterministic CI builds
+- Production-grade schema constraints
 
-## MVP User Flow (End-to-End)
+## 🧰 Tech Stack
 
-- User signs in with OAuth
-- Uploads resume (PDF or DOCX)
-- Resume is parsed server-side
-- AI analysis runs (multi-step)
-- Results page is shown
-- User is prompted to start trial
-- Trial auto-renews unless canceled
+### Frontend
 
-## Core MVP Features (Must Ship)
+- React
+- TanStack Router
+- TypeScript
+- Vitest (unit testing)
 
-### Authentication
+### Backend
 
-- OAuth (Google, GitHub)
-- Protected routes
-- Session persistence
+- Node.js (planned modular service layer)
+- Supabase (Postgres + Auth + Storage)
+- OpenAI (AI analysis)
+- Stripe (billing)
 
-### Resume Upload and Parsing
+### Infrastructure
 
-- PDF and DOCX only
-- Supabase Storage
-- Server-side text extraction
-- Versioned resume storage
+- Supabase
+- GitHub Actions
+- SonarCloud
 
-### AI Resume Analysis (ChatGPT Only)
+## ⚡ Quick Start
 
-Included in MVP:
+```bash
+git clone https://github.com/frank-mendez/ResumeIQ
+cd ResumeIQ
+cp .env.example .env
+npm install
+npm run dev
+```
 
-- Resume structuring
-- Role and seniority inference
-- ATS compatibility score (0 to 100)
-- Score breakdown:
-  - Formatting
-  - Keywords
-  - Clarity
-  - Experience relevance
-  - Strengths
-  - High-risk issues
-  - Missing information callouts
+Make sure environment variables are configured before running.
 
-Not included:
+## 🔐 Environment Variables
 
-- No resume auto-writing
-- No fake metrics
-- No "perfect resume" claims
+Create a `.env` file:
 
-### Actionable Improvements
+```env
+# Supabase (Frontend)
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 
-- Bullet-level rewrite suggestions
-- Clear explanation of why each rewrite is better
-- "[add metric]" placeholders instead of hallucinations
+# Backend Only
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+```
 
-### Results UI
+⚠ Never expose `SUPABASE_SERVICE_ROLE_KEY` to the frontend.
 
-- ATS score card
-- Strengths list
-- Issues list
-- Improvement suggestions
-- Clear verdict summary
+## ☁️ Supabase Setup
 
-### Payments and Access Control (Critical)
+1. Create a Supabase project.
+2. Enable Row Level Security on all tables.
+3. Create a storage bucket named:
 
-Pricing (locked):
+```txt
+resumes
+```
 
-- $2.95 for first 7 days
-- Auto-renews at $19.95/month
-- Cancel anytime
-- Managed entirely by ResumeIQ
+4. Apply migrations from `/supabase/migrations`.
+5. Ensure RLS policies are enabled.
 
-What is included during trial:
+## 🗄 Database Schema Overview
 
-- Full resume analysis
-- Bullet rewrite suggestions
-- Results history
+Core tables:
 
-Stripe requirements:
+- `profiles`
+- `resumes`
+- `resume_versions`
+- `resume_analyses`
+- `user_credits`
+- `subscriptions`
+- `payments`
+- `usage_logs`
 
-- Checkout session
-- Subscription handling
-- Webhooks for:
-  - Trial start
-  - Renewal
-  - Cancellation
-  - Payment failure
+### Design Highlights
 
-Feature gating:
+- Foreign keys are NOT NULL
+- Stripe IDs are unique
+- One active version per resume
+- Soft delete support
+- AI analysis status tracking
+- Credit-based usage control
+- Strict RLS enforcement
 
-- No analysis without active trial or subscription
-- Trial is one per user
-- Server-side enforcement only
+## 📄 Resume Upload Flow
 
-## Explicit Non-Goals (MVP Will Not Include)
+1. Validate file type (PDF/DOCX)
+2. Validate file size (max 5MB)
+3. Upload to Supabase Storage
+4. Insert metadata in `resumes`
+5. Create initial `resume_version`
+6. Trigger AI processing (backend)
 
-- Resume editor
-- Resume export (DOCX or PDF)
-- Multiple job descriptions
-- Resume templates
-- Cover letters
-- Team accounts
-- AI chat interface
+Storage path format:
 
-If it does not directly improve resume screening success, it is out.
+```txt
+user_id/resume_id/original_filename
+```
 
-## MVP Success Criteria (Ship / No-Ship)
+## 🧠 AI Processing Flow
 
-You ship MVP when:
+Frontend → Backend → OpenAI → Store Analysis → Deduct Credits
 
-- Resume parsing works reliably
-- ATS scores feel realistic (not inflated)
-- Users understand why they got the score
-- Stripe trial to renewal works end-to-end
-- You can explain this app in one sentence
+- Status tracked (`pending`, `processing`, `completed`, `failed`)
+- Token usage logged
+- Cost tracking supported
+- Credits updated transactionally
 
-"ResumeIQ shows how your resume performs in ATS systems and tells you exactly how to fix it."
+## 💳 Billing Model
 
-## Final Reality Check
+- Stripe subscriptions
+- Payment intents logged
+- Status validation enforced
+- Financial tables backend-controlled
+- Users can view but not mutate financial records
 
-This MVP:
+## 🧪 Testing
 
-- Is small enough to ship
-- Is strong enough to charge for
-- Demonstrates real AI engineering
-- Looks serious to recruiters and users
+Run tests:
 
-Most people overbuild. You are doing the opposite, and that is why this will work.
+```bash
+npm run test
+```
+
+Run with coverage:
+
+```bash
+npm run test -- --coverage
+```
+
+Coverage is required for CI and SonarCloud Quality Gate.
+
+## 🔁 CI / Quality Gate
+
+CI runs:
+
+- Lint
+- Unit tests
+- Coverage
+- Build
+- SonarCloud analysis
+
+Quality Gate enforces:
+
+- Coverage on new code
+- No critical vulnerabilities
+- Maintainability standards
+
+## 🔒 Security Model
+
+- RLS enabled on all user-owned tables
+- Financial and credit tables are backend-write only
+- No service role key exposed client-side
+- Strict storage path isolation
+- Stripe webhook validation required
+
+## 📊 Scalability Considerations
+
+Ready for:
+
+- 10k+ users
+- Credit-based monetization
+- AI cost tracking
+- Admin dashboards
+- Subscription tiers
+
+## 🛣 Roadmap
+
+- Resume parsing improvements
+- Multi-language resume support
+- Team / organization accounts
+- AI resume rewriting
+- Interview prep module
+
+## 📄 License
+
+MIT License
+
+## 👨‍💻 Author
+
+Built by Frank Mendez.
