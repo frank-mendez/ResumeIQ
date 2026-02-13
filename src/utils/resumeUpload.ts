@@ -168,6 +168,25 @@ export async function uploadFileToSupabaseStorageWithProgress({
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const abortHandler = () => xhr.abort();
+    let settled = false;
+
+    const cleanup = () => {
+      if (!signal) {
+        return;
+      }
+
+      signal.removeEventListener("abort", abortHandler);
+    };
+
+    const finish = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      callback();
+    };
 
     xhr.open("POST", uploadUrl);
     xhr.setRequestHeader("authorization", `Bearer ${accessToken}`);
@@ -188,23 +207,39 @@ export async function uploadFileToSupabaseStorageWithProgress({
     };
 
     xhr.onerror = () => {
-      reject(new Error("Network error while uploading. Please try again."));
+      finish(() => {
+        reject(new Error("Network error while uploading. Please try again."));
+      });
     };
 
     xhr.onabort = () => {
-      reject(new DOMException("Upload canceled", "AbortError"));
+      finish(() => {
+        reject(new DOMException("Upload canceled", "AbortError"));
+      });
     };
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
+        finish(() => {
+          resolve();
+        });
         return;
       }
 
-      reject(new Error(parseUploadErrorMessage(xhr.responseText, xhr.status)));
+      finish(() => {
+        reject(
+          new Error(parseUploadErrorMessage(xhr.responseText, xhr.status)),
+        );
+      });
     };
 
-    signal?.addEventListener("abort", abortHandler, { once: true });
+    signal?.addEventListener("abort", abortHandler);
+
+    if (signal?.aborted) {
+      xhr.abort();
+      return;
+    }
+
     xhr.send(file);
   });
 }

@@ -97,7 +97,7 @@ function Dashboard() {
   );
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploadState, setUploadState] = React.useState<
-    "idle" | "uploading" | "success" | "failed"
+    "idle" | "uploading" | "saving" | "success" | "failed"
   >("idle");
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const [resumes, setResumes] = React.useState<Array<ResumeListItem>>([]);
@@ -136,49 +136,73 @@ function Dashboard() {
     uploadAbortControllerRef.current?.abort();
   }, []);
 
-  const loadResumes = React.useCallback(async () => {
-    if (!user?.id) {
-      setResumes([]);
-      setIsLoadingResumes(false);
-      return;
-    }
+  const loadResumes = React.useCallback(
+    async (options?: { isCancelled?: () => boolean }) => {
+      const isCancelled = options?.isCancelled;
+      const shouldSkipState = () => isCancelled?.() === true;
 
-    setIsLoadingResumes(true);
-    setResumeLoadError(null);
+      if (!user?.id) {
+        if (shouldSkipState()) {
+          return;
+        }
 
-    try {
-      const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase
-        .from("resumes")
-        .select("id, original_filename, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        throw error;
+        setResumes([]);
+        setIsLoadingResumes(false);
+        return;
       }
 
-      setResumes((data ?? []) as Array<ResumeListItem>);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to load resumes right now.";
-      setResumeLoadError(message);
-      setResumes([]);
-    } finally {
-      setIsLoadingResumes(false);
-    }
-  }, [user?.id]);
+      if (shouldSkipState()) {
+        return;
+      }
+
+      setIsLoadingResumes(true);
+      setResumeLoadError(null);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data, error } = await supabase
+          .from("resumes")
+          .select("id, original_filename, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        if (shouldSkipState()) {
+          return;
+        }
+
+        setResumes((data ?? []) as Array<ResumeListItem>);
+      } catch (error) {
+        if (shouldSkipState()) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to load resumes right now.";
+        setResumeLoadError(message);
+        setResumes([]);
+      } finally {
+        if (!shouldSkipState()) {
+          setIsLoadingResumes(false);
+        }
+      }
+    },
+    [user?.id],
+  );
 
   const handleUpload = React.useCallback(async () => {
-    const isUploading = uploadState === "uploading";
-    if (isUploading) {
+    const isBusy = uploadState === "uploading" || uploadState === "saving";
+    if (isBusy) {
       return;
     }
 
     const precheckError = getUploadPrecheckError({
-      isUploading,
+      isUploading: isBusy,
       userId: user?.id,
       selectedFile,
       maxUploadBytes,
@@ -242,6 +266,8 @@ function Dashboard() {
       });
 
       setUploadProgress(100);
+      setUploadState("saving");
+      uploadAbortControllerRef.current = null;
 
       await insertResumeMetadataWithSession({
         supabase,
@@ -294,10 +320,9 @@ function Dashboard() {
     let cancelled = false;
 
     const load = async () => {
-      await loadResumes();
-      if (cancelled) {
-        return;
-      }
+      await loadResumes({
+        isCancelled: () => cancelled,
+      });
     };
 
     load();

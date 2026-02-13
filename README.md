@@ -168,10 +168,11 @@ npm run test
 Run with coverage:
 
 ```bash
-npm run test -- --coverage
+npm run test:coverage
 ```
 
 Coverage is required for CI and SonarCloud Quality Gate.
+Pre-commit also enforces coverage thresholds.
 
 ## 🔁 CI / Quality Gate
 

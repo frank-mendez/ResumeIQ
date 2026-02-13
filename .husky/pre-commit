@@ -3,4 +3,4 @@
 set -e
 
 npm run lint:staged
-npm run test
+npm run test:coverage
