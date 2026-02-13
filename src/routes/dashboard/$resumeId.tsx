@@ -182,7 +182,10 @@ function ResumeAnalysis() {
           </div>
 
           {isLoading ? (
-            <div className="mt-6 rounded-xl border border-gray-200 bg-white/40 p-5 dark:border-gray-800 dark:bg-gray-950/20">
+            <div
+              className="mt-6 rounded-xl border border-gray-200 bg-white/40 p-5 dark:border-gray-800 dark:bg-gray-950/20"
+              aria-live="polite"
+            >
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Loading analysis...
               </p>
@@ -190,7 +193,10 @@ function ResumeAnalysis() {
           ) : null}
 
           {!isLoading && errorMessage ? (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900/50 dark:bg-rose-950/20">
+            <div
+              className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-900/50 dark:bg-rose-950/20"
+              role="alert"
+            >
               <p className="text-sm font-semibold text-rose-900 dark:text-rose-200">
                 Analysis unavailable
               </p>
