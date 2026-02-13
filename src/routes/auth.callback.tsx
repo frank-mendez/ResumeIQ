@@ -31,6 +31,84 @@ function decodeOrRaw(value: string) {
   }
 }
 
+function getOAuthProviderError(search: {
+  error?: string;
+  error_description?: string;
+}) {
+  if (!search.error && !search.error_description) {
+    return null;
+  }
+
+  return search.error_description
+    ? decodeOrRaw(search.error_description)
+    : (search.error ?? "OAuth sign-in failed");
+}
+
+function getOAuthCode(searchCode?: string) {
+  return (
+    searchCode ??
+    new URL(globalThis.location.href).searchParams.get("code") ??
+    undefined
+  );
+}
+
+async function exchangeOAuthCodeIfPresent(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  code: string | undefined,
+) {
+  if (!code) {
+    return null;
+  }
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  return error?.message ?? null;
+}
+
+async function upsertProfile(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  user: {
+    id: string;
+    user_metadata?: {
+      full_name?: unknown;
+      avatar_url?: unknown;
+    };
+  },
+) {
+  const fullName = toOptionalString(user.user_metadata?.full_name);
+  const avatarUrl = toOptionalString(user.user_metadata?.avatar_url);
+
+  const profilePayload: {
+    id: string;
+    full_name?: string;
+    avatar_url?: string;
+  } = {
+    id: user.id,
+  };
+
+  if (fullName !== null) {
+    profilePayload.full_name = fullName;
+  }
+
+  if (avatarUrl !== null) {
+    profilePayload.avatar_url = avatarUrl;
+  }
+
+  const { error: profileError } = await (
+    supabase.from("profiles") as unknown as {
+      upsert: (
+        values: Record<string, unknown>,
+        options: { onConflict: string },
+      ) => Promise<{ error: { message: string } | null }>;
+    }
+  ).upsert(profilePayload as Record<string, unknown>, {
+    onConflict: "id",
+  });
+
+  if (profileError) {
+    console.error("Profile upsert error", profileError);
+  }
+}
+
 function AuthCallback() {
   const search = Route.useSearch();
   const router = useRouter();
@@ -47,92 +125,48 @@ function AuthCallback() {
   React.useEffect(() => {
     let cancelled = false;
 
+    const setErrorIfActive = (nextMessage: string) => {
+      if (cancelled) {
+        return;
+      }
+
+      setStatus("error");
+      setMessage(nextMessage);
+    };
+
     async function run() {
       try {
         const supabase = getSupabaseBrowserClient();
 
-        // If the provider redirected back with an error, surface it.
-        if (search.error || search.error_description) {
-          const desc = search.error_description
-            ? decodeOrRaw(search.error_description)
-            : undefined;
-
-          if (!cancelled) {
-            setStatus("error");
-            setMessage(desc || search.error || "OAuth sign-in failed");
-          }
+        const oauthProviderError = getOAuthProviderError(search);
+        if (oauthProviderError) {
+          setErrorIfActive(oauthProviderError);
           return;
         }
 
-        // In OAuth code flow, exchange the code in the callback URL for a persisted session.
-        const code =
-          search.code ?? new URL(window.location.href).searchParams.get("code");
+        const exchangeError = await exchangeOAuthCodeIfPresent(
+          supabase,
+          getOAuthCode(search.code),
+        );
 
-        if (code) {
-          const { error: exchangeError } =
-            await supabase.auth.exchangeCodeForSession(code);
-
-          if (exchangeError) {
-            if (!cancelled) {
-              setStatus("error");
-              setMessage(exchangeError.message);
-            }
-            return;
-          }
+        if (exchangeError) {
+          setErrorIfActive(exchangeError);
+          return;
         }
 
         const { data, error } = await getSessionWithRetry(supabase);
 
         if (error) {
-          if (!cancelled) {
-            setStatus("error");
-            setMessage(error.message);
-          }
+          setErrorIfActive(error.message);
           return;
         }
 
         if (!data.session) {
-          if (!cancelled) {
-            setStatus("error");
-            setMessage("No session found after OAuth redirect.");
-          }
+          setErrorIfActive("No session found after OAuth redirect.");
           return;
         }
 
-        const user = data.session.user;
-        const fullName = toOptionalString(user.user_metadata?.full_name);
-        const avatarUrl = toOptionalString(user.user_metadata?.avatar_url);
-
-        const profilePayload: {
-          id: string;
-          full_name?: string;
-          avatar_url?: string;
-        } = {
-          id: user.id,
-        };
-
-        if (fullName !== null) {
-          profilePayload.full_name = fullName;
-        }
-
-        if (avatarUrl !== null) {
-          profilePayload.avatar_url = avatarUrl;
-        }
-
-        const { error: profileError } = await (
-          supabase.from("profiles") as unknown as {
-            upsert: (
-              values: Record<string, unknown>,
-              options: { onConflict: string },
-            ) => Promise<{ error: { message: string } | null }>;
-          }
-        ).upsert(profilePayload as Record<string, unknown>, {
-          onConflict: "id",
-        });
-
-        if (profileError) {
-          console.error("Profile upsert error", profileError);
-        }
+        await upsertProfile(supabase, data.session.user);
 
         if (cancelled) return;
         setStatus("done");
@@ -140,12 +174,9 @@ function AuthCallback() {
         await router.invalidate();
         await router.navigate({ to: redirectPath, replace: true });
       } catch (err) {
-        if (!cancelled) {
-          setStatus("error");
-          setMessage(
-            err instanceof Error ? err.message : "Failed to complete OAuth",
-          );
-        }
+        setErrorIfActive(
+          err instanceof Error ? err.message : "Failed to complete OAuth",
+        );
       }
     }
 
