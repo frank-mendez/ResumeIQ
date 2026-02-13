@@ -36,7 +36,7 @@ jobs:
           fi
 
       - name: Run SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@0303d6b62e310685c0e34d0b9cde218036885c4d
+        uses: SonarSource/sonarcloud-github-action@v2
         with:
           args: >
             -Dsonar.qualitygate.wait=true
