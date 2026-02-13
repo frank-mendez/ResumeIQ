@@ -55,36 +55,35 @@ async function loadLatestAnalysisForResume(
   supabase: SupabaseClient,
   resumeId: string,
 ) {
-  const { data: versions, error: versionsError } = await supabase
+  const { data: latestVersion, error: versionsError } = await supabase
     .from("resume_versions")
     .select("id")
     .eq("resume_id", resumeId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (versionsError) {
     throw versionsError;
   }
 
-  const versionIds = ((versions ?? []) as Array<{ id: string }>).map(
-    (version) => version.id,
-  );
-
-  if (versionIds.length === 0) {
+  if (!latestVersion) {
     return null;
   }
 
-  const { data: analyses, error: analysesError } = await supabase
+  const { data: latestAnalysis, error: analysesError } = await supabase
     .from("resume_analyses")
     .select("id, overall_score, created_at")
-    .in("resume_version_id", versionIds)
+    .eq("resume_version_id", latestVersion.id)
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(1)
+    .maybeSingle();
 
   if (analysesError) {
     throw analysesError;
   }
 
-  return (analyses?.[0] ?? null) as ResumeAnalysisRecord | null;
+  return (latestAnalysis ?? null) as ResumeAnalysisRecord | null;
 }
 
 function formatDate(value: string | null) {

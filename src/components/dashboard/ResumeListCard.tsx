@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ResumeListItem } from "~/components/dashboard/types";
 
 type ResumeListCardProps = Readonly<{
@@ -77,8 +78,9 @@ export function ResumeListCard({
         <ul className="mt-5 space-y-2" aria-label="Uploaded resumes">
           {resumes.map((resume) => (
             <li key={resume.id}>
-              <a
-                href={`/dashboard/${resume.id}`}
+              <Link
+                to="/dashboard/$resumeId"
+                params={{ resumeId: resume.id }}
                 className="block rounded-xl border border-gray-200 bg-white/70 p-4 hover:bg-white dark:border-gray-800 dark:bg-gray-950/40 dark:hover:bg-gray-950"
               >
                 <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -87,7 +89,7 @@ export function ResumeListCard({
                 <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                   Uploaded {formatUploadDate(resume.created_at)}
                 </p>
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
