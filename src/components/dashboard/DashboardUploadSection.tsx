@@ -29,6 +29,7 @@ export function DashboardUploadSection({
   uploadProgress,
 }: DashboardUploadSectionProps) {
   const [isDragging, setIsDragging] = React.useState(false);
+  const dragDepthRef = React.useRef(0);
 
   const isUploading = uploadState === "uploading";
   const isSavingMetadata = uploadState === "saving";
@@ -61,6 +62,15 @@ export function DashboardUploadSection({
     (event: React.DragEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
+    },
+    [],
+  );
+
+  const handleDragEnter = React.useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      dragDepthRef.current += 1;
       setIsDragging(true);
     },
     [],
@@ -70,7 +80,11 @@ export function DashboardUploadSection({
     (event: React.DragEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      setIsDragging(false);
+
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      if (dragDepthRef.current === 0) {
+        setIsDragging(false);
+      }
     },
     [],
   );
@@ -79,6 +93,7 @@ export function DashboardUploadSection({
     (event: React.DragEvent<HTMLElement>) => {
       event.preventDefault();
       event.stopPropagation();
+      dragDepthRef.current = 0;
       setIsDragging(false);
       handlePickedFiles(event.dataTransfer.files);
     },
@@ -103,6 +118,7 @@ export function DashboardUploadSection({
       </div>
 
       <input
+        id="resume-upload-input"
         ref={fileInputRef}
         type="file"
         accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -110,30 +126,26 @@ export function DashboardUploadSection({
         onChange={handleFileInputChange}
       />
 
-      <div
+      <label
+        htmlFor="resume-upload-input"
         className={`mt-6 rounded-xl border border-dashed p-6 text-sm transition-colors ${
           isDragging
             ? "border-gray-500 bg-white dark:border-gray-500 dark:bg-gray-950"
             : "border-gray-300 bg-white/40 dark:border-gray-700 dark:bg-gray-950/20"
         }`}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
-        <button
-          type="button"
-          onClick={onOpenPicker}
-          disabled={isBusy}
-          className="w-full rounded-lg border border-dashed border-gray-300 bg-white/60 p-4 text-left hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950/30 dark:hover:bg-gray-950"
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
+        <div className="w-full rounded-lg border border-dashed border-gray-300 bg-white/60 p-4 text-left dark:border-gray-700 dark:bg-gray-950/30">
           <p className="font-semibold text-gray-900 dark:text-gray-100">
             Drag and drop your resume here
           </p>
           <p className="mt-1 leading-relaxed text-gray-600 dark:text-gray-300">
-            Click to choose a file manually.
+            Click this area or use Choose file below.
           </p>
-        </button>
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -199,7 +211,10 @@ export function DashboardUploadSection({
         ) : null}
 
         {uploadState === "success" ? (
-          <p className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+          <p
+            className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-300"
+            aria-live="polite"
+          >
             Upload successful.
           </p>
         ) : null}
@@ -225,7 +240,7 @@ export function DashboardUploadSection({
             </p>
           </div>
         ) : null}
-      </div>
+      </label>
     </section>
   );
 }
