@@ -1,6 +1,11 @@
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
-export function NotFound({ children }: { children?: any }) {
+type NotFoundProps = Readonly<{
+  children?: ReactNode;
+}>;
+
+export function NotFound({ children }: NotFoundProps) {
   return (
     <main className="px-4 py-12 sm:py-16">
       <div className="mx-auto max-w-2xl">
@@ -25,7 +30,7 @@ export function NotFound({ children }: { children?: any }) {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={() => globalThis.history.back()}
                 className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white/60 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-white dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-100 dark:hover:bg-gray-950"
               >
                 Go back

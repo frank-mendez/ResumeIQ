@@ -1,5 +1,4 @@
 node_modules
-package-lock.json
 yarn.lock
 
 .DS_Store
@@ -9,6 +8,7 @@ yarn.lock
 .output
 .nitro
 dist
+coverage
 /build/
 /api/
 /server/build

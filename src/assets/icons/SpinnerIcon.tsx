@@ -3,14 +3,17 @@ type SpinnerIconProps = {
   className?: string;
 };
 
-export function SpinnerIcon({ ariaLabel, className }: SpinnerIconProps) {
+export function SpinnerIcon({
+  ariaLabel,
+  className,
+}: Readonly<SpinnerIconProps>) {
   return (
     <svg
       viewBox="0 0 24 24"
       className={className ?? "h-5 w-5 animate-spin text-gray-700 dark:text-gray-200"}
-      role="img"
       aria-label={ariaLabel}
     >
+      <title>{ariaLabel}</title>
       <circle
         cx="12"
         cy="12"
