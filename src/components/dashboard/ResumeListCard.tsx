@@ -1,29 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import type { ResumeListItem } from "~/components/dashboard/types";
+import { formatDisplayDate } from "~/utils/date";
 
 type ResumeListCardProps = Readonly<{
   resumes: Array<ResumeListItem>;
   isLoading: boolean;
   loadError: string | null;
 }>;
-
-function formatUploadDate(value: string | null) {
-  if (!value) {
-    return "Unknown date";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown date";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
-}
 
 export function ResumeListCard({
   resumes,
@@ -87,7 +70,7 @@ export function ResumeListCard({
                   {resume.original_filename}
                 </p>
                 <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                  Uploaded {formatUploadDate(resume.created_at)}
+                  Uploaded {formatDisplayDate(resume.created_at)}
                 </p>
               </Link>
             </li>

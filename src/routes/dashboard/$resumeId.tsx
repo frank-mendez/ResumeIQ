@@ -2,6 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as React from "react";
 import { makeTitle, seo } from "~/utils/seo";
+import { formatDisplayDate } from "~/utils/date";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 import { requireDashboardAuth } from "~/utils/routeAuth";
 
@@ -84,24 +85,6 @@ async function loadLatestAnalysisForResume(
   }
 
   return (latestAnalysis ?? null) as ResumeAnalysisRecord | null;
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "Unknown date";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown date";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
 }
 
 function ResumeAnalysis() {
@@ -221,7 +204,7 @@ function ResumeAnalysis() {
             <div className="mt-6 space-y-4">
               <div className="rounded-xl border border-gray-200 bg-white/60 p-5 dark:border-gray-800 dark:bg-gray-950/20">
                 <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Uploaded {formatDate(resume.created_at)}
+                  Uploaded {formatDisplayDate(resume.created_at)}
                 </p>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   Latest analysis status for this resume.
@@ -231,7 +214,7 @@ function ResumeAnalysis() {
               {analysis ? (
                 <div className="rounded-xl border border-gray-200 bg-white/60 p-5 dark:border-gray-800 dark:bg-gray-950/20">
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    Last analyzed {formatDate(analysis.created_at)}
+                    Last analyzed {formatDisplayDate(analysis.created_at)}
                   </p>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     Overall score: {analysis.overall_score ?? "Not scored"}
