@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { makeTitle, seo } from "~/utils/seo";
 
 export const Route = createFileRoute("/")({

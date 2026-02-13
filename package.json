@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "start": "vite preview",
     "database:login": "npx supabase login",
-    "database:init": "npx supabase init"
+    "database:init": "npx supabase init",
+    "generate-routes": "npx @tanstack/router-cli generate"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
