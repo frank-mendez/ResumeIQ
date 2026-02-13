@@ -12,9 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
   eslint:
     needs: setup
@@ -24,9 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: ESLint
         run: npm run lint
 
@@ -38,9 +36,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Test
         run: npm run test
 
@@ -55,9 +52,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Test with coverage
         run: npx vitest --coverage.enabled true
       - name: Report Coverage
@@ -72,9 +68,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Build
         run: npm run build
 
@@ -89,9 +84,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Run tests with coverage for Sonar
         run: npm run test
       - name: Validate Sonar token
