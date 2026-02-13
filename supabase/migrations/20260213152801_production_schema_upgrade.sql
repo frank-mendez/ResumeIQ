@@ -118,6 +118,30 @@ alter table resumes
 alter table resume_versions
   add column if not exists is_current boolean default false;
 
+update resume_versions
+set is_current = false
+where is_current is distinct from false;
+
+with latest_versions as (
+  select id
+  from (
+    select
+      id,
+      resume_id,
+      created_at,
+      row_number() over (
+        partition by resume_id
+        order by created_at desc, id desc
+      ) as rn
+    from resume_versions
+  ) ranked_versions
+  where rn = 1
+)
+update resume_versions rv
+set is_current = true
+from latest_versions lv
+where rv.id = lv.id;
+
 create unique index if not exists one_current_version_per_resume
   on resume_versions(resume_id)
   where is_current = true;
@@ -156,6 +180,8 @@ create table if not exists user_credits (
 alter table user_credits enable row level security;
 
 -- Users can view their own credit balance
+drop policy if exists "Users can view own credits" on user_credits;
+
 create policy "Users can view own credits"
   on user_credits
   for select
@@ -174,12 +200,12 @@ begin
   if not exists (
     select 1
     from pg_constraint
-    where conrelid = 'public.subscriptions'::regclass
+    where conrelid = 'subscriptions'::regclass
       and conname = 'subscriptions_status_check'
   ) then
     alter table subscriptions
       add constraint subscriptions_status_check
-      check (status in ('incomplete','incomplete_expired','trialing','active','past_due','canceled','unpaid'));
+      check (status in ('incomplete','incomplete_expired','trialing','active','past_due','canceled','unpaid','paused'));
   end if;
 end
 $$;
@@ -191,6 +217,8 @@ create unique index if not exists uniq_stripe_subscription
 alter table subscriptions enable row level security;
 
 -- Users can view their own subscription
+drop policy if exists "Users can view own subscription" on subscriptions;
+
 create policy "Users can view own subscription"
   on subscriptions
   for select
@@ -208,6 +236,8 @@ create unique index if not exists uniq_payment_intent
 -- Enable RLS
 alter table payments enable row level security;
 
+drop policy if exists "Users can view own payments" on payments;
+
 create policy "Users can view own payments"
   on payments
   for select
@@ -223,13 +253,15 @@ alter table usage_logs
   add column if not exists resume_analysis_id uuid references resume_analyses(id) on delete set null;
 
 alter table usage_logs
-  add column if not exists input_tokens int check (input_tokens >= 0);
+  add column if not exists input_tokens int not null default 0 check (input_tokens >= 0);
 
 alter table usage_logs
-  add column if not exists output_tokens int check (output_tokens >= 0);
+  add column if not exists output_tokens int not null default 0 check (output_tokens >= 0);
 
 -- Enable RLS
 alter table usage_logs enable row level security;
+
+drop policy if exists "Users can view own usage logs" on usage_logs;
 
 create policy "Users can view own usage logs"
   on usage_logs
@@ -248,6 +280,176 @@ create policy "Users can view own resumes"
   on resumes
   for select
   using (auth.uid() = user_id AND deleted_at IS NULL);
+
+do $$
+declare
+  pol record;
+begin
+  for pol in
+    select
+      p.polname,
+      p.polcmd,
+      n.nspname,
+      c.relname,
+      coalesce(pg_get_expr(p.polqual, p.polrelid), 'true') as using_expr
+    from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where c.relname = 'resumes'
+      and n.nspname = 'public'
+      and p.polcmd in ('u', 'd')
+  loop
+    if position('deleted_at' in pol.using_expr) = 0 then
+      execute format(
+        'alter policy %I on %I.%I using ((%s) AND deleted_at IS NULL);',
+        pol.polname,
+        pol.nspname,
+        pol.relname,
+        pol.using_expr
+      );
+    end if;
+  end loop;
+end
+$$;
+
+drop policy if exists "Users can view own resume versions" on resume_versions;
+drop policy if exists "Users can insert own resume versions" on resume_versions;
+drop policy if exists "Users can update own resume versions" on resume_versions;
+drop policy if exists "Users can modify own resume versions" on resume_versions;
+drop policy if exists "Users can delete own resume versions" on resume_versions;
+
+create policy "Users can view own resume versions"
+  on resume_versions
+  for select
+  using (
+    exists (
+      select 1
+      from resumes r
+      where r.id = resume_versions.resume_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+create policy "Users can insert own resume versions"
+  on resume_versions
+  for insert
+  with check (
+    exists (
+      select 1
+      from resumes r
+      where r.id = resume_versions.resume_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+create policy "Users can update own resume versions"
+  on resume_versions
+  for update
+  using (
+    exists (
+      select 1
+      from resumes r
+      where r.id = resume_versions.resume_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from resumes r
+      where r.id = resume_versions.resume_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+create policy "Users can delete own resume versions"
+  on resume_versions
+  for delete
+  using (
+    exists (
+      select 1
+      from resumes r
+      where r.id = resume_versions.resume_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+drop policy if exists "Users can view own resume analyses" on resume_analyses;
+drop policy if exists "Users can insert own resume analyses" on resume_analyses;
+drop policy if exists "Users can update own resume analyses" on resume_analyses;
+drop policy if exists "Users can modify own resume analyses" on resume_analyses;
+drop policy if exists "Users can delete own resume analyses" on resume_analyses;
+
+create policy "Users can view own resume analyses"
+  on resume_analyses
+  for select
+  using (
+    exists (
+      select 1
+      from resume_versions rv
+      join resumes r on r.id = rv.resume_id
+      where rv.id = resume_analyses.resume_version_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+create policy "Users can insert own resume analyses"
+  on resume_analyses
+  for insert
+  with check (
+    exists (
+      select 1
+      from resume_versions rv
+      join resumes r on r.id = rv.resume_id
+      where rv.id = resume_analyses.resume_version_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+create policy "Users can update own resume analyses"
+  on resume_analyses
+  for update
+  using (
+    exists (
+      select 1
+      from resume_versions rv
+      join resumes r on r.id = rv.resume_id
+      where rv.id = resume_analyses.resume_version_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from resume_versions rv
+      join resumes r on r.id = rv.resume_id
+      where rv.id = resume_analyses.resume_version_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
+
+create policy "Users can delete own resume analyses"
+  on resume_analyses
+  for delete
+  using (
+    exists (
+      select 1
+      from resume_versions rv
+      join resumes r on r.id = rv.resume_id
+      where rv.id = resume_analyses.resume_version_id
+        and r.user_id = auth.uid()
+        and r.deleted_at is null
+    )
+  );
 
 -- =========================================
 -- Migration Complete
