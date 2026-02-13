@@ -25,34 +25,36 @@ describe("Dashboard components", () => {
 
   it("renders DashboardUploadSection with upload CTA", () => {
     const html = renderToStaticMarkup(
-      <DashboardUploadSection onUpload={vi.fn()} />,
+      <DashboardUploadSection
+        onOpenPicker={vi.fn()}
+        onFilePicked={vi.fn()}
+        onSubmitUpload={vi.fn()}
+        onCancelUpload={vi.fn()}
+        fileInputRef={{ current: null }}
+        selectedFile={null}
+        maxFileSizeBytes={5 * 1024 * 1024}
+        validationError={null}
+        uploadError={null}
+        uploadState="idle"
+        uploadProgress={0}
+      />,
     );
 
     expect(html).toContain("Upload resume");
     expect(html).toContain("Choose file");
-    expect(html).toContain("No resume uploaded yet");
+    expect(html).toContain("Drag and drop your resume here");
   });
 
   it("renders DashboardWelcomeCard selected filename and fallback text", () => {
     const withFileHtml = renderToStaticMarkup(
-      <DashboardWelcomeCard
-        pickedFileName="resume.pdf"
-        onUpload={vi.fn()}
-        fileInputRef={{ current: null }}
-        onFileChange={vi.fn()}
-      />,
+      <DashboardWelcomeCard pickedFileName="resume.pdf" onUpload={vi.fn()} />,
     );
     const withoutFileHtml = renderToStaticMarkup(
-      <DashboardWelcomeCard
-        pickedFileName={null}
-        onUpload={vi.fn()}
-        fileInputRef={{ current: null }}
-        onFileChange={vi.fn()}
-      />,
+      <DashboardWelcomeCard pickedFileName={null} onUpload={vi.fn()} />,
     );
 
     expect(withFileHtml).toContain("Selected: resume.pdf");
-    expect(withoutFileHtml).toContain("PDF or Word (.doc/.docx)");
+    expect(withoutFileHtml).toContain("PDF or DOCX up to 5MB");
   });
 
   it("renders QuickActionsCard call-to-actions", () => {

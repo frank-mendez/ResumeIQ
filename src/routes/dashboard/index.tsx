@@ -7,8 +7,21 @@ import { QuickActionsCard } from "~/components/dashboard/QuickActionsCard";
 import { ResumeListCard } from "~/components/dashboard/ResumeListCard";
 import type { ResumeListItem } from "~/components/dashboard/types";
 import { makeTitle, seo } from "~/utils/seo";
-import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
+import {
+  insertResumeMetadataWithSession,
+  getResumeTitle,
+  getResumeUploadMaxBytes,
+  mapMimeTypeToResumeFileType,
+  normalizeOriginalFilename,
+  sanitizeStorageFilename,
+  uploadFileToSupabaseStorageWithProgress,
+  validateResumeFile,
+} from "~/utils/resumeUpload";
 import { requireDashboardAuth } from "~/utils/routeAuth";
+import {
+  getSupabaseBrowserClient,
+  getSupabaseBrowserConfig,
+} from "~/utils/supabase.browser";
 
 export const Route = createFileRoute("/dashboard/")({
   beforeLoad: async ({ context, location }) => {
@@ -28,74 +41,274 @@ export const Route = createFileRoute("/dashboard/")({
   component: Dashboard,
 });
 
+function getUploadPrecheckError({
+  isUploading,
+  userId,
+  selectedFile,
+  maxUploadBytes,
+}: {
+  isUploading: boolean;
+  userId: string | undefined;
+  selectedFile: File | null;
+  maxUploadBytes: number;
+}) {
+  if (isUploading) {
+    return null;
+  }
+
+  if (!userId) {
+    return "Your session has expired. Please sign in again.";
+  }
+
+  if (!selectedFile) {
+    return "Choose a resume file before uploading.";
+  }
+
+  const validation = validateResumeFile(selectedFile, maxUploadBytes);
+  if (!validation.valid) {
+    return validation.error;
+  }
+
+  if (!mapMimeTypeToResumeFileType(selectedFile.type)) {
+    return "Only PDF and DOCX files are supported.";
+  }
+
+  return null;
+}
+
+function toUploadErrorMessage(error: unknown) {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Upload canceled.";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Upload failed. Please try again.";
+}
+
 function Dashboard() {
   const { user } = Route.useRouteContext();
-  const [pickedFileName, setPickedFileName] = React.useState<string | null>(
+  const navigate = Route.useNavigate();
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [validationError, setValidationError] = React.useState<string | null>(
     null,
   );
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [uploadState, setUploadState] = React.useState<
+    "idle" | "uploading" | "success" | "failed"
+  >("idle");
+  const [uploadProgress, setUploadProgress] = React.useState(0);
   const [resumes, setResumes] = React.useState<Array<ResumeListItem>>([]);
   const [isLoadingResumes, setIsLoadingResumes] = React.useState(true);
   const [resumeLoadError, setResumeLoadError] = React.useState<string | null>(
     null,
   );
+
+  const maxUploadBytes = React.useMemo(() => getResumeUploadMaxBytes(), []);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const uploadAbortControllerRef = React.useRef<AbortController | null>(null);
 
   const openPicker = React.useCallback(() => {
     fileInputRef.current?.click();
   }, []);
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const handleFilePicked = React.useCallback(
+    (file: File | null) => {
+      setUploadError(null);
+      setUploadState("idle");
+      setUploadProgress(0);
+      setSelectedFile(file);
 
-    const loadResumes = async () => {
-      if (!user?.id) {
-        if (!cancelled) {
-          setResumes([]);
-          setIsLoadingResumes(false);
-        }
+      if (!file) {
+        setValidationError(null);
         return;
       }
 
-      setIsLoadingResumes(true);
-      setResumeLoadError(null);
+      const validation = validateResumeFile(file, maxUploadBytes);
+      setValidationError(validation.valid ? null : validation.error);
+    },
+    [maxUploadBytes],
+  );
 
-      try {
-        const supabase = getSupabaseBrowserClient();
-        const { data, error } = await supabase
-          .from("resumes")
-          .select("id, original_filename, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+  const cancelUpload = React.useCallback(() => {
+    uploadAbortControllerRef.current?.abort();
+  }, []);
 
-        if (error) {
-          throw error;
-        }
+  const loadResumes = React.useCallback(async () => {
+    if (!user?.id) {
+      setResumes([]);
+      setIsLoadingResumes(false);
+      return;
+    }
 
-        if (!cancelled) {
-          setResumes((data ?? []) as Array<ResumeListItem>);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unable to load resumes right now.";
-          setResumeLoadError(message);
-          setResumes([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingResumes(false);
-        }
+    setIsLoadingResumes(true);
+    setResumeLoadError(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } = await supabase
+        .from("resumes")
+        .select("id, original_filename, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      setResumes((data ?? []) as Array<ResumeListItem>);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to load resumes right now.";
+      setResumeLoadError(message);
+      setResumes([]);
+    } finally {
+      setIsLoadingResumes(false);
+    }
+  }, [user?.id]);
+
+  const handleUpload = React.useCallback(async () => {
+    const isUploading = uploadState === "uploading";
+    if (isUploading) {
+      return;
+    }
+
+    const precheckError = getUploadPrecheckError({
+      isUploading,
+      userId: user?.id,
+      selectedFile,
+      maxUploadBytes,
+    });
+
+    if (precheckError) {
+      if (user?.id === undefined) {
+        setUploadError(precheckError);
+        setUploadState("failed");
+      } else {
+        setValidationError(precheckError);
+      }
+      return;
+    }
+
+    const fileToUpload = selectedFile;
+    const userId = user?.id;
+
+    if (!fileToUpload || !userId) {
+      setUploadError("Upload failed. Please try again.");
+      setUploadState("failed");
+      return;
+    }
+
+    const fileType = mapMimeTypeToResumeFileType(fileToUpload.type);
+    if (!fileType) {
+      setUploadError("Upload failed. Please try again.");
+      setUploadState("failed");
+      return;
+    }
+
+    setValidationError(null);
+    setUploadError(null);
+    setUploadState("uploading");
+    setUploadProgress(0);
+
+    const supabase = getSupabaseBrowserClient();
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseBrowserConfig();
+
+    const resumeId = globalThis.crypto.randomUUID();
+    const originalFilename = normalizeOriginalFilename(fileToUpload.name);
+    const safeStorageFilename = sanitizeStorageFilename(originalFilename);
+    const storagePath = `${userId}/${resumeId}/${safeStorageFilename}`;
+    const title = getResumeTitle(originalFilename);
+
+    const abortController = new AbortController();
+    uploadAbortControllerRef.current = abortController;
+
+    try {
+      await uploadFileToSupabaseStorageWithProgress({
+        supabase,
+        supabaseUrl,
+        supabaseAnonKey,
+        bucket: "resumes",
+        path: storagePath,
+        file: fileToUpload,
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+        },
+        signal: abortController.signal,
+      });
+
+      setUploadProgress(100);
+
+      await insertResumeMetadataWithSession({
+        supabase,
+        supabaseUrl,
+        supabaseAnonKey,
+        record: {
+          id: resumeId,
+          user_id: userId,
+          original_filename: originalFilename,
+          file_type: fileType,
+          storage_path: storagePath,
+          title,
+        },
+      });
+
+      setUploadState("success");
+      await loadResumes();
+      await navigate({
+        to: "/dashboard/$resumeId",
+        params: { resumeId },
+      });
+    } catch (error) {
+      const { error: cleanupError } = await supabase.storage
+        .from("resumes")
+        .remove([storagePath]);
+
+      if (cleanupError) {
+        console.error("Failed to cleanup uploaded resume after error", {
+          cleanupError,
+          storagePath,
+        });
+      }
+
+      setUploadError(toUploadErrorMessage(error));
+      setUploadState("failed");
+      setUploadProgress(0);
+    } finally {
+      uploadAbortControllerRef.current = null;
+    }
+  }, [
+    loadResumes,
+    maxUploadBytes,
+    navigate,
+    selectedFile,
+    uploadState,
+    user?.id,
+  ]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      await loadResumes();
+      if (cancelled) {
+        return;
       }
     };
 
-    loadResumes();
+    load();
 
     return () => {
       cancelled = true;
+      uploadAbortControllerRef.current?.abort();
     };
-  }, [user?.id]);
+  }, [loadResumes]);
+
+  const pickedFileName = selectedFile?.name ?? null;
 
   return (
     <main>
@@ -107,12 +320,6 @@ function Dashboard() {
             <DashboardWelcomeCard
               pickedFileName={pickedFileName}
               onUpload={openPicker}
-              fileInputRef={fileInputRef}
-              onFileChange={(event) => {
-                const file = event.currentTarget.files?.[0] ?? null;
-                setPickedFileName(file ? file.name : null);
-                event.currentTarget.value = "";
-              }}
             />
 
             <section
@@ -128,7 +335,19 @@ function Dashboard() {
               <QuickActionsCard onUpload={openPicker} />
             </section>
 
-            <DashboardUploadSection onUpload={openPicker} />
+            <DashboardUploadSection
+              onOpenPicker={openPicker}
+              onFilePicked={handleFilePicked}
+              onSubmitUpload={handleUpload}
+              onCancelUpload={cancelUpload}
+              fileInputRef={fileInputRef}
+              selectedFile={selectedFile}
+              maxFileSizeBytes={maxUploadBytes}
+              validationError={validationError}
+              uploadError={uploadError}
+              uploadState={uploadState}
+              uploadProgress={uploadProgress}
+            />
           </div>
         </div>
       </div>

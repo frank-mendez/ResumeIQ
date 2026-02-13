@@ -1,17 +1,11 @@
-import * as React from "react";
-
 type DashboardWelcomeCardProps = Readonly<{
   pickedFileName: string | null;
   onUpload: () => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }>;
 
 export function DashboardWelcomeCard({
   pickedFileName,
   onUpload,
-  fileInputRef,
-  onFileChange,
 }: DashboardWelcomeCardProps) {
   return (
     <header className="rounded-2xl border border-gray-200 bg-white/60 p-6 dark:border-gray-800 dark:bg-gray-950/40 sm:p-8">
@@ -36,17 +30,10 @@ export function DashboardWelcomeCard({
           >
             Upload Resume
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.doc,.docx"
-            className="sr-only"
-            onChange={onFileChange}
-          />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {pickedFileName
               ? `Selected: ${pickedFileName}`
-              : "PDF or Word (.doc/.docx)"}
+              : "PDF or DOCX up to 5MB"}
           </p>
         </div>
       </div>
