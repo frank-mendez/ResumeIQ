@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export function GitHubIcon(props: React.SVGProps<SVGSVGElement>) {
+export function GitHubIcon(props: Readonly<React.SVGProps<SVGSVGElement>>) {
   return (
     <svg viewBox="0 0 24 24" {...props}>
       <path
