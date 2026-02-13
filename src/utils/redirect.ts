@@ -1,3 +1,14 @@
+function hasControlCharacters(value: string) {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint !== undefined && (codePoint <= 31 || codePoint === 127)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function toSafeRedirectPath(raw: string | undefined) {
   if (!raw) return "/dashboard";
 
@@ -7,7 +18,7 @@ export function toSafeRedirectPath(raw: string | undefined) {
   if (!normalized.startsWith("/")) return "/dashboard";
   if (normalized.startsWith("//")) return "/dashboard";
   if (normalized.includes("\\")) return "/dashboard";
-  if (/[\u0000-\u001F\u007F]/.test(normalized)) return "/dashboard";
+  if (hasControlCharacters(normalized)) return "/dashboard";
 
   return normalized;
 }

@@ -9,6 +9,7 @@ yarn.lock
 .output
 .nitro
 dist
+coverage
 /build/
 /api/
 /server/build
