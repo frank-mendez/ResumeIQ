@@ -64,8 +64,9 @@ function Login() {
       try {
         const supabase = getSupabaseBrowserClient();
 
-        const oauthBaseUrl =
+        const rawOauthBaseUrl =
           import.meta.env.VITE_APP_URL ?? globalThis.location.origin;
+        const oauthBaseUrl = rawOauthBaseUrl.trim().replace(/\/+$/, "");
         const redirectTo = `${oauthBaseUrl}/auth/callback?redirect=${encodeURIComponent(
           safeRedirectPath,
         )}`;

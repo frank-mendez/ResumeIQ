@@ -19,8 +19,11 @@ type ResumeAnalysisRecord = {
 };
 
 export const Route = createFileRoute("/dashboard/$resumeId")({
-  beforeLoad: async ({ location }) => {
-    await requireDashboardAuth({ location });
+  beforeLoad: async ({ location, context }) => {
+    await requireDashboardAuth({
+      location,
+      hasKnownUser: Boolean(context.user),
+    });
   },
   head: () => ({
     meta: [
