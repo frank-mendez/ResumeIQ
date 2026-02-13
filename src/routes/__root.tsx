@@ -11,7 +11,7 @@ import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 export const Route = createRootRoute({
   beforeLoad: async () => {
-    if (typeof window === "undefined") {
+    if (globalThis.window === undefined) {
       return { user: null };
     }
 

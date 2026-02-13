@@ -1,11 +1,11 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
 import { OAuthButton } from "~/components/auth/OAuthButton";
 import { AuthProviderEnum, AuthProviderType } from "~/types/auth";
 import { toSafeRedirectPath } from "~/utils/redirect";
+import { redirectAuthenticatedFromLogin } from "~/utils/routeAuth";
 import { makeTitle, seo } from "~/utils/seo";
-import { hasSessionUser } from "~/utils/authSession";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
@@ -16,26 +16,10 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => searchSchema.parse(search),
   beforeLoad: async ({ context, search }) => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const redirectTo = toSafeRedirectPath(search.redirect);
-
-    if (context.user) {
-      throw redirect({
-        to: redirectTo,
-      });
-    }
-
-    const supabase = getSupabaseBrowserClient();
-    const isAuthenticated = await hasSessionUser(supabase);
-
-    if (isAuthenticated) {
-      throw redirect({
-        to: redirectTo,
-      });
-    }
+    await redirectAuthenticatedFromLogin({
+      redirectPath: search.redirect,
+      hasKnownUser: Boolean(context.user),
+    });
   },
   head: () => ({
     meta: [
@@ -65,7 +49,7 @@ function Login() {
   }, [routeError]);
 
   const errorMessage =
-    localError ?? (!dismissedRouteError ? decodedRouteError : null);
+    localError ?? (dismissedRouteError ? null : decodedRouteError);
 
   const safeRedirectPath = React.useMemo(
     () => toSafeRedirectPath(redirectParam),
@@ -80,9 +64,8 @@ function Login() {
       try {
         const supabase = getSupabaseBrowserClient();
 
-        const oauthBaseUrl = import.meta.env.DEV
-          ? "http://localhost:3000"
-          : globalThis.location.origin;
+        const oauthBaseUrl =
+          import.meta.env.VITE_APP_URL ?? globalThis.location.origin;
         const redirectTo = `${oauthBaseUrl}/auth/callback?redirect=${encodeURIComponent(
           safeRedirectPath,
         )}`;

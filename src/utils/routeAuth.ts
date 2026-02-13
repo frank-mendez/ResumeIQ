@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import { hasSessionUser } from "~/utils/authSession";
+import { toSafeRedirectPath } from "~/utils/redirect";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 type RouteLocationLike = {
@@ -35,4 +36,35 @@ export async function requireDashboardAuth({
       redirect: `${location.pathname}${searchPart}`,
     },
   });
+}
+
+type RedirectAuthenticatedFromLoginOptions = {
+  redirectPath: string | undefined;
+  hasKnownUser?: boolean;
+};
+
+export async function redirectAuthenticatedFromLogin({
+  redirectPath,
+  hasKnownUser = false,
+}: RedirectAuthenticatedFromLoginOptions) {
+  if (globalThis.window === undefined) {
+    return;
+  }
+
+  const redirectTo = toSafeRedirectPath(redirectPath);
+
+  if (hasKnownUser) {
+    throw redirect({
+      to: redirectTo,
+    });
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const isAuthenticated = await hasSessionUser(supabase);
+
+  if (isAuthenticated) {
+    throw redirect({
+      to: redirectTo,
+    });
+  }
 }

@@ -107,7 +107,7 @@ function formatDate(value: string | null) {
 
 function ResumeAnalysis() {
   const { user } = Route.useRouteContext();
-  const { resumeId } = Route.useParams() as { resumeId: string };
+  const { resumeId } = Route.useParams();
 
   const [resume, setResume] = React.useState<ResumeRecord | null>(null);
   const [analysis, setAnalysis] = React.useState<ResumeAnalysisRecord | null>(
