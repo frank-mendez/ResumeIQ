@@ -10,6 +10,7 @@
     "start": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
+    "lint:staged": "lint-staged",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "database:login": "npx supabase login",

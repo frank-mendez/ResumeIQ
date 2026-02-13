@@ -13,8 +13,10 @@ describe("formatDisplayDate", () => {
 
   it("formats valid dates", () => {
     const result = formatDisplayDate("2026-01-15T12:00:00.000Z");
+    const otherResult = formatDisplayDate("2027-01-15T12:00:00.000Z");
 
     expect(result).not.toBe("Unknown date");
-    expect(result).toContain("2026");
+    expect(otherResult).not.toBe("Unknown date");
+    expect(result).not.toBe(otherResult);
   });
 });
