@@ -1,13 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-type GetSessionResult = Awaited<
-  ReturnType<SupabaseClient["auth"]["getSession"]>
->;
-
-type SessionRetryOptions = {
-  attempts?: number;
-  delayMs?: number;
-};
+import type {
+  GetSessionResult,
+  SessionRetryOptions,
+} from "~/types/authSession";
 
 const DEFAULT_SESSION_RETRY_ATTEMPTS = 6;
 const DEFAULT_SESSION_RETRY_DELAY_MS = 120;

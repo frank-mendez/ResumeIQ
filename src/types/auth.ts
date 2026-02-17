@@ -1,7 +1,4 @@
-export enum AuthProviderEnum {
-  GITHUB = "github",
-  GOOGLE = "google",
-}
+import { AuthProviderEnum } from "~/enums/auth";
 
 export type AuthProviderType =
   | AuthProviderEnum.GITHUB

@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RESUMES_TABLE, RESUME_STORAGE_BUCKET } from "~/constants/resume";
+import { ResumeFileTypeEnum } from "~/enums/resume";
+import type { SessionResponse } from "~/types/testing";
 
 import {
   formatFileSize,
@@ -12,11 +15,6 @@ import {
   uploadFileToSupabaseStorageWithProgress,
   validateResumeFile,
 } from "../resumeUpload";
-
-type SessionResponse = {
-  data: { session: { access_token?: string } | null };
-  error: Error | null;
-};
 
 function createSupabaseMock(options?: {
   sessionResponse?: SessionResponse;
@@ -66,7 +64,7 @@ function createSupabaseMock(options?: {
       }),
     },
     from: vi.fn().mockImplementation((table: string) => {
-      if (table !== "resumes") {
+      if (table !== RESUMES_TABLE) {
         throw new Error(`Unexpected table: ${table}`);
       }
 
@@ -120,12 +118,14 @@ describe("resumeUpload utils", () => {
   });
 
   it("maps supported mime types to db file types", () => {
-    expect(mapMimeTypeToResumeFileType("application/pdf")).toBe("pdf");
+    expect(mapMimeTypeToResumeFileType("application/pdf")).toBe(
+      ResumeFileTypeEnum.PDF,
+    );
     expect(
       mapMimeTypeToResumeFileType(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ),
-    ).toBe("docx");
+    ).toBe(ResumeFileTypeEnum.DOCX);
     expect(mapMimeTypeToResumeFileType("application/msword")).toBeNull();
   });
 
@@ -153,7 +153,7 @@ describe("resumeUpload utils", () => {
 
     await uploadFileToSupabaseStorageWithProgress({
       supabase: client,
-      bucket: "resumes",
+      bucket: RESUME_STORAGE_BUCKET,
       path: "user-id/resume-id/resume.pdf",
       file,
       onProgress: (value) => progress.push(value),
@@ -181,7 +181,7 @@ describe("resumeUpload utils", () => {
 
     await uploadFileToSupabaseStorageWithProgress({
       supabase: client,
-      bucket: "resumes",
+      bucket: RESUME_STORAGE_BUCKET,
       path: "user/resume.pdf",
       file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
       onProgress: vi.fn(),
@@ -199,7 +199,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -218,7 +218,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -237,7 +237,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -258,7 +258,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -279,7 +279,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -305,7 +305,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -324,7 +324,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -346,7 +346,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -383,7 +383,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -401,7 +401,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: (progress) => {
@@ -422,7 +422,7 @@ describe("resumeUpload utils", () => {
     await expect(
       uploadFileToSupabaseStorageWithProgress({
         supabase: client,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: "user/resume.pdf",
         file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
         onProgress: vi.fn(),
@@ -440,7 +440,7 @@ describe("resumeUpload utils", () => {
         id: "resume-id",
         user_id: "user-id",
         original_filename: "resume.pdf",
-        file_type: "pdf",
+        file_type: ResumeFileTypeEnum.PDF,
         storage_path: "user-id/resume-id/resume.pdf",
         title: "resume",
       },
@@ -451,7 +451,7 @@ describe("resumeUpload utils", () => {
       id: "resume-id",
       user_id: "user-id",
       original_filename: "resume.pdf",
-      file_type: "pdf",
+      file_type: ResumeFileTypeEnum.PDF,
       storage_path: "user-id/resume-id/resume.pdf",
       title: "resume",
     });
@@ -472,7 +472,7 @@ describe("resumeUpload utils", () => {
           id: "resume-id",
           user_id: "user-id",
           original_filename: "resume.pdf",
-          file_type: "pdf",
+          file_type: ResumeFileTypeEnum.PDF,
           storage_path: "user-id/resume-id/resume.pdf",
           title: "resume",
         },
@@ -493,7 +493,7 @@ describe("resumeUpload utils", () => {
           id: "resume-id",
           user_id: "user-id",
           original_filename: "resume.pdf",
-          file_type: "pdf",
+          file_type: ResumeFileTypeEnum.PDF,
           storage_path: "user-id/resume-id/resume.pdf",
           title: "resume",
         },
@@ -511,7 +511,7 @@ describe("resumeUpload utils", () => {
           id: "resume-id",
           user_id: "user-id",
           original_filename: "resume.pdf",
-          file_type: "pdf",
+          file_type: ResumeFileTypeEnum.PDF,
           storage_path: "user-id/resume-id/resume.pdf",
           title: "resume",
         },

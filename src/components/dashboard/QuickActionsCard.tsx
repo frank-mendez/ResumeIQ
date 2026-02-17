@@ -1,6 +1,4 @@
-type QuickActionsCardProps = Readonly<{
-  onUpload: () => void;
-}>;
+import type { QuickActionsCardProps } from "~/types/components";
 
 export function QuickActionsCard({ onUpload }: QuickActionsCardProps) {
   return (

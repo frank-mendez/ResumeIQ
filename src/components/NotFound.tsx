@@ -1,9 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-
-type NotFoundProps = Readonly<{
-  children?: ReactNode;
-}>;
+import type { NotFoundProps } from "~/types/components";
 
 export function NotFound({ children }: NotFoundProps) {
   return (

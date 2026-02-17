@@ -1,12 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import type { ResumeListItem } from "~/components/dashboard/types";
+import type { ResumeListCardProps } from "~/types/components";
 import { formatDisplayDate } from "~/utils/date";
-
-type ResumeListCardProps = Readonly<{
-  resumes: Array<ResumeListItem>;
-  isLoading: boolean;
-  loadError: string | null;
-}>;
 
 export function ResumeListCard({
   resumes,

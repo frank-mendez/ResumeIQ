@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { OAuthButton } from "../auth/OAuthButton";
-import { AuthProviderEnum } from "~/types/auth";
+import { AuthProviderEnum } from "~/enums/auth";
 
 describe("OAuthButton", () => {
   it("renders provider label when not loading", () => {
@@ -18,7 +18,7 @@ describe("OAuthButton", () => {
 
     expect(html).toContain("Continue with Google");
     expect(html).not.toContain("Working…");
-    expect(html).toContain("aria-hidden=\"true\"");
+    expect(html).toContain('aria-hidden="true"');
   });
 
   it("renders spinner state and disabled attribute while loading", () => {
@@ -33,7 +33,7 @@ describe("OAuthButton", () => {
     );
 
     expect(html).toContain("Working…");
-    expect(html).toContain("aria-label=\"Loading github\"");
+    expect(html).toContain('aria-label="Loading github"');
     expect(html).toContain("disabled");
   });
 });

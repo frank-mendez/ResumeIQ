@@ -1,19 +1,7 @@
 import * as React from "react";
-import { formatFileSize } from "~/utils/resumeUpload";
-
-type DashboardUploadSectionProps = Readonly<{
-  onOpenPicker: () => void;
-  onFilePicked: (file: File | null) => void;
-  onSubmitUpload: () => void;
-  onCancelUpload: () => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  selectedFile: File | null;
-  maxFileSizeBytes: number;
-  validationError: string | null;
-  uploadError: string | null;
-  uploadState: "idle" | "uploading" | "saving" | "success" | "failed";
-  uploadProgress: number;
-}>;
+import { ResumeUploadStateEnum } from "~/enums/resume";
+import type { DashboardUploadSectionProps } from "~/types/components";
+import { formatFileSize } from "~/utils/resumeFile";
 
 export function DashboardUploadSection({
   onOpenPicker,
@@ -31,8 +19,8 @@ export function DashboardUploadSection({
   const [isDragging, setIsDragging] = React.useState(false);
   const dragDepthRef = React.useRef(0);
 
-  const isUploading = uploadState === "uploading";
-  const isSavingMetadata = uploadState === "saving";
+  const isUploading = uploadState === ResumeUploadStateEnum.UPLOADING;
+  const isSavingMetadata = uploadState === ResumeUploadStateEnum.SAVING;
   const isBusy = isUploading || isSavingMetadata;
   const canUpload = Boolean(selectedFile) && !validationError && !isBusy;
   let uploadButtonLabel = "Upload";
@@ -186,7 +174,7 @@ export function DashboardUploadSection({
           </div>
         ) : null}
 
-        {uploadState === "uploading" ? (
+        {uploadState === ResumeUploadStateEnum.UPLOADING ? (
           <div className="mt-4" aria-live="polite">
             <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
               <div
@@ -201,7 +189,7 @@ export function DashboardUploadSection({
           </div>
         ) : null}
 
-        {uploadState === "saving" ? (
+        {uploadState === ResumeUploadStateEnum.SAVING ? (
           <p
             className="mt-4 text-xs text-gray-600 dark:text-gray-400"
             aria-live="polite"
@@ -210,7 +198,7 @@ export function DashboardUploadSection({
           </p>
         ) : null}
 
-        {uploadState === "success" ? (
+        {uploadState === ResumeUploadStateEnum.SUCCESS ? (
           <p
             className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-300"
             aria-live="polite"

@@ -1,7 +1,4 @@
-type SpinnerIconProps = {
-  ariaLabel: string;
-  className?: string;
-};
+import type { SpinnerIconProps } from "~/types/components";
 
 export function SpinnerIcon({
   ariaLabel,
@@ -10,7 +7,9 @@ export function SpinnerIcon({
   return (
     <svg
       viewBox="0 0 24 24"
-      className={className ?? "h-5 w-5 animate-spin text-gray-700 dark:text-gray-200"}
+      className={
+        className ?? "h-5 w-5 animate-spin text-gray-700 dark:text-gray-200"
+      }
       aria-label={ariaLabel}
     >
       <title>{ariaLabel}</title>

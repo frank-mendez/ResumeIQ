@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { ResumeUploadStateEnum } from "~/enums/resume";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...props }: Record<string, unknown>) => (
@@ -35,7 +36,7 @@ describe("Dashboard components", () => {
         maxFileSizeBytes={5 * 1024 * 1024}
         validationError={null}
         uploadError={null}
-        uploadState="idle"
+        uploadState={ResumeUploadStateEnum.IDLE}
         uploadProgress={0}
       />,
     );

@@ -1,12 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import * as React from "react";
 import { z } from "zod";
 import { OAuthButton } from "~/components/auth/OAuthButton";
-import { AuthProviderEnum, AuthProviderType } from "~/types/auth";
-import { toSafeRedirectPath } from "~/utils/redirect";
+import { AuthProviderEnum } from "~/enums/auth";
+import { useOAuthLogin } from "~/hooks/useOAuthLogin";
 import { redirectAuthenticatedFromLogin } from "~/utils/routeAuth";
 import { makeTitle, seo } from "~/utils/seo";
-import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 const searchSchema = z.object({
   error: z.string().optional(),
@@ -34,61 +32,11 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const { error: routeError, redirect: redirectParam } = Route.useSearch();
-  const [loadingProvider, setLoadingProvider] =
-    React.useState<AuthProviderType | null>(null);
-  const [localError, setLocalError] = React.useState<string | null>(null);
-  const [dismissedRouteError, setDismissedRouteError] = React.useState(false);
-
-  const decodedRouteError = React.useMemo(() => {
-    if (!routeError) return null;
-    try {
-      return decodeURIComponent(routeError);
-    } catch {
-      return routeError;
-    }
-  }, [routeError]);
-
-  const errorMessage =
-    localError ?? (dismissedRouteError ? null : decodedRouteError);
-
-  const safeRedirectPath = React.useMemo(
-    () => toSafeRedirectPath(redirectParam),
-    [redirectParam],
-  );
-
-  const redirectTo = `${globalThis.location.origin}/auth/callback?redirect=${encodeURIComponent(
-    safeRedirectPath,
-  )}`;
-
-  const startOAuth = React.useCallback(
-    async (provider: AuthProviderType) => {
-      setLocalError(null);
-      setLoadingProvider(provider);
-
-      try {
-        const supabase = getSupabaseBrowserClient();
-
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider,
-          options: {
-            redirectTo,
-          },
-        });
-
-        if (error) {
-          setLocalError(error.message);
-          setLoadingProvider(null);
-        }
-        // On success, Supabase redirects the browser away from this page.
-      } catch (err) {
-        setLocalError(
-          err instanceof Error ? err.message : "Failed to start OAuth",
-        );
-        setLoadingProvider(null);
-      }
-    },
-    [safeRedirectPath],
-  );
+  const { loadingProvider, errorMessage, startOAuth, dismissError } =
+    useOAuthLogin({
+      routeError,
+      redirectParam,
+    });
 
   return (
     <main>
@@ -114,10 +62,7 @@ function Login() {
                   <p className="leading-relaxed">{errorMessage}</p>
                   <button
                     type="button"
-                    onClick={() => {
-                      setLocalError(null);
-                      setDismissedRouteError(true);
-                    }}
+                    onClick={dismissError}
                     className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-rose-900/80 hover:bg-rose-100 dark:text-rose-100/80 dark:hover:bg-rose-950"
                   >
                     Dismiss
