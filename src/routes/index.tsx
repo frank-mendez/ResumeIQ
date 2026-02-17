@@ -26,7 +26,9 @@ function Home() {
                   className="h-2 w-2 rounded-full bg-emerald-500"
                   aria-hidden="true"
                 />
-                ResumeIQ — resume feedback that’s clear, actionable, and fast
+                <span>
+                  ResumeIQ — resume feedback that’s clear, actionable, and fast
+                </span>
               </div>
 
               <div className="space-y-3">

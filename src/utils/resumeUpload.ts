@@ -106,24 +106,6 @@ export function mapMimeTypeToResumeFileType(
   return null;
 }
 
-function parseUploadErrorMessage(responseText: string | null, status: number) {
-  if (!responseText) {
-    return `Upload failed with status ${status}.`;
-  }
-
-  try {
-    const parsed = JSON.parse(responseText) as {
-      error?: string;
-      message?: string;
-    };
-    return (
-      parsed.error ?? parsed.message ?? `Upload failed with status ${status}.`
-    );
-  } catch {
-    return `Upload failed with status ${status}.`;
-  }
-}
-
 function isUnauthorizedStorageError(
   error: {
     message?: string;
@@ -139,10 +121,52 @@ function isUnauthorizedStorageError(
 
   return (
     statusCode === "401" ||
-    statusCode === "403" ||
     message.includes("unauthorized") ||
     message.includes("jwt")
   );
+}
+
+function toStorageError(error: unknown): {
+  message?: string;
+  statusCode?: string | number;
+} | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  return error as {
+    message?: string;
+    statusCode?: string | number;
+  };
+}
+
+function throwOriginalOrFallback(error: unknown) {
+  if (error instanceof Error) {
+    throw error;
+  }
+
+  const storageError = toStorageError(error);
+  if (storageError?.message) {
+    throw new Error(storageError.message);
+  }
+
+  throw new Error("Upload failed with status 500.");
+}
+
+async function refreshUploadSessionOrThrow(
+  supabase: SupabaseClient,
+  originalError: unknown,
+) {
+  const { data: refreshData, error: refreshError } =
+    await supabase.auth.refreshSession();
+
+  if (refreshError || !refreshData.session?.access_token) {
+    if (originalError instanceof Error) {
+      throw originalError;
+    }
+
+    throw new Error("Your session has expired. Please sign in again.");
+  }
 }
 
 export async function uploadFileToSupabaseStorageWithProgress({
@@ -180,41 +204,13 @@ export async function uploadFileToSupabaseStorageWithProgress({
   try {
     await uploadOnce();
   } catch (error) {
-    const storageError =
-      error && typeof error === "object"
-        ? (error as {
-            message?: string;
-            statusCode?: string | number;
-          })
-        : null;
+    const storageError = toStorageError(error);
 
     if (!isUnauthorizedStorageError(storageError)) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error(parseUploadErrorMessage(null, 500));
+      throwOriginalOrFallback(error);
     }
 
-    const { data: refreshData, error: refreshError } =
-      await supabase.auth.refreshSession();
-
-    if (refreshError) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error("Your session has expired. Please sign in again.");
-    }
-
-    const refreshedAccessToken = refreshData.session?.access_token;
-    if (!refreshedAccessToken) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error("Your session has expired. Please sign in again.");
-    }
+    await refreshUploadSessionOrThrow(supabase, error);
 
     await uploadOnce();
   }

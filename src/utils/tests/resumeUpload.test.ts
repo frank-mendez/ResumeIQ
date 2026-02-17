@@ -21,7 +21,11 @@ type SessionResponse = {
 function createSupabaseMock(options?: {
   sessionResponse?: SessionResponse;
   uploadResponses?: Array<{
-    error: { message: string; statusCode?: string } | null;
+    error: {
+      name?: string;
+      message: string;
+      statusCode?: string | number;
+    } | null;
   }>;
   refreshResponse?: {
     data: { session: { access_token?: string } | null };
@@ -189,6 +193,131 @@ describe("resumeUpload utils", () => {
 
     expect(refreshSessionMock).toHaveBeenCalledTimes(1);
     expect(uploadMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects on network error without retrying", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [{ error: { message: "Network error" } }],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Network error");
+
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects on 403 storage bucket error without retrying", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [{ error: { message: "Forbidden", statusCode: "403" } }],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Forbidden");
+
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects on 409 storage conflict error without retrying", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [{ error: { message: "Conflict", statusCode: "409" } }],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Conflict");
+
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects on 500 server error without retrying", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [
+        { error: { message: "Server error", statusCode: "500" } },
+      ],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Server error");
+
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects on 502 gateway error without retrying", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [
+        { error: { message: "Bad gateway", statusCode: "502" } },
+      ],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Bad gateway");
+
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats abort during active upload as a canceled upload", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [
+        {
+          error: {
+            name: "AbortError",
+            message: "Upload canceled",
+          },
+        },
+      ],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Upload canceled");
+
+    expect(refreshSessionMock).not.toHaveBeenCalled();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects when upload is already aborted", async () => {

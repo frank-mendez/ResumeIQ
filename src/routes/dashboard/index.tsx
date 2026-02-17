@@ -305,8 +305,6 @@ function Dashboard() {
         });
       }
 
-      console.log("Upload error:", error);
-
       setUploadError(toUploadErrorMessage(error));
       setUploadState("failed");
       setUploadProgress(0);
