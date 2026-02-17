@@ -1,17 +1,11 @@
 import { redirect } from "@tanstack/react-router";
+import type {
+  RedirectAuthenticatedFromLoginOptions,
+  RequireDashboardAuthOptions,
+} from "~/types/routeAuth";
 import { hasSessionUser } from "~/utils/authSession";
 import { toSafeRedirectPath } from "~/utils/redirect";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
-
-type RouteLocationLike = {
-  pathname: string;
-  search: unknown;
-};
-
-type RequireDashboardAuthOptions = {
-  location: RouteLocationLike;
-  hasKnownUser?: boolean;
-};
 
 export async function requireDashboardAuth({
   location,
@@ -37,11 +31,6 @@ export async function requireDashboardAuth({
     },
   });
 }
-
-type RedirectAuthenticatedFromLoginOptions = {
-  redirectPath: string | undefined;
-  hasKnownUser?: boolean;
-};
 
 export async function redirectAuthenticatedFromLogin({
   redirectPath,

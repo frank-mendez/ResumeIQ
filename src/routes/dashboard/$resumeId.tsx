@@ -1,22 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import * as React from "react";
+import { useResumeAnalysis } from "~/hooks/useResumeAnalysis";
 import { makeTitle, seo } from "~/utils/seo";
 import { formatDisplayDate } from "~/utils/date";
-import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 import { requireDashboardAuth } from "~/utils/routeAuth";
-
-type ResumeRecord = {
-  id: string;
-  original_filename: string;
-  created_at: string | null;
-};
-
-type ResumeAnalysisRecord = {
-  id: string;
-  overall_score: number | null;
-  created_at: string | null;
-};
 
 export const Route = createFileRoute("/dashboard/$resumeId")({
   beforeLoad: async ({ location, context }) => {
@@ -36,132 +22,13 @@ export const Route = createFileRoute("/dashboard/$resumeId")({
   component: ResumeAnalysis,
 });
 
-async function loadOwnedResume(
-  supabase: SupabaseClient,
-  resumeId: string,
-  userId: string,
-) {
-  const { data, error } = await supabase
-    .from("resumes")
-    .select("id, original_filename, created_at")
-    .eq("id", resumeId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? null) as ResumeRecord | null;
-}
-
-async function loadLatestAnalysisForResume(
-  supabase: SupabaseClient,
-  resumeId: string,
-) {
-  const { data: latestVersion, error: versionsError } = await supabase
-    .from("resume_versions")
-    .select("id")
-    .eq("resume_id", resumeId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (versionsError) {
-    throw versionsError;
-  }
-
-  if (!latestVersion) {
-    return null;
-  }
-
-  const { data: latestAnalysis, error: analysesError } = await supabase
-    .from("resume_analyses")
-    .select("id, overall_score, created_at")
-    .eq("resume_version_id", latestVersion.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (analysesError) {
-    throw analysesError;
-  }
-
-  return (latestAnalysis ?? null) as ResumeAnalysisRecord | null;
-}
-
 function ResumeAnalysis() {
   const { user } = Route.useRouteContext();
   const { resumeId } = Route.useParams();
-
-  const [resume, setResume] = React.useState<ResumeRecord | null>(null);
-  const [analysis, setAnalysis] = React.useState<ResumeAnalysisRecord | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    const loadAnalysis = async () => {
-      if (!user?.id) {
-        if (!cancelled) {
-          setErrorMessage("You must be signed in to view this analysis.");
-          setIsLoading(false);
-        }
-        return;
-      }
-
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const supabase = getSupabaseBrowserClient();
-
-        const resumeData = await loadOwnedResume(supabase, resumeId, user.id);
-
-        if (!resumeData) {
-          if (!cancelled) {
-            setResume(null);
-            setAnalysis(null);
-            setErrorMessage("Resume not found.");
-          }
-          return;
-        }
-
-        const latestAnalysis = await loadLatestAnalysisForResume(
-          supabase,
-          resumeId,
-        );
-
-        if (!cancelled) {
-          setResume(resumeData);
-          setAnalysis(latestAnalysis);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unable to load analysis right now.";
-          setErrorMessage(message);
-          setResume(null);
-          setAnalysis(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadAnalysis();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [resumeId, user?.id]);
+  const { resume, analysis, isLoading, errorMessage } = useResumeAnalysis({
+    resumeId,
+    userId: user?.id,
+  });
 
   return (
     <main>

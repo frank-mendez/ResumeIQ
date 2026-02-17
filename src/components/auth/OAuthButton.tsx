@@ -2,15 +2,9 @@ import * as React from "react";
 import { GitHubIcon } from "~/assets/icons/GitHubIcon";
 import { GoogleIcon } from "~/assets/icons/GoogleIcon";
 import { SpinnerIcon } from "~/assets/icons/SpinnerIcon";
-import { AuthProviderEnum, AuthProviderType } from "~/types/auth";
-
-type OAuthButtonProps = {
-  provider: AuthProviderType;
-  label: string;
-  loading: boolean;
-  disabled: boolean;
-  onClick: () => void;
-};
+import { AuthProviderEnum } from "~/enums/auth";
+import type { OAuthButtonProps } from "~/types/components";
+import type { AuthProviderType } from "~/types/auth";
 
 const providerIcons: Record<
   AuthProviderType,
@@ -26,7 +20,7 @@ export function OAuthButton({
   loading,
   disabled,
   onClick,
-}: OAuthButtonProps) {
+}: Readonly<OAuthButtonProps>) {
   const ProviderIcon = providerIcons[provider];
 
   return (

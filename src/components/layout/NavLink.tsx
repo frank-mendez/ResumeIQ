@@ -1,12 +1,7 @@
 import { Link } from "@tanstack/react-router";
+import type { NavLinkProps } from "~/types/components";
 
-type NavLinkProps = {
-  to: string;
-  label: string;
-  exact?: boolean;
-};
-
-export function NavLink({ to, label, exact }: NavLinkProps) {
+export function NavLink({ to, label, exact }: Readonly<NavLinkProps>) {
   return (
     <Link
       to={to}

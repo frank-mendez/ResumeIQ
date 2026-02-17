@@ -1,11 +1,6 @@
 import { getCookies, setCookie } from "@tanstack/react-start/server";
 import { createServerClient } from "@supabase/ssr";
-
-type CookieToSet = {
-  name: string;
-  value: string;
-  options?: Parameters<typeof setCookie>[2];
-};
+import type { CookieToSet } from "~/types/supabase";
 
 export function getSupabaseServerClient() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;

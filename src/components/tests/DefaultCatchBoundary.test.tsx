@@ -1,4 +1,8 @@
 import type { ReactElement, ReactNode } from "react";
+import type {
+  ClickableElementProps,
+  ElementWithChildrenProps,
+} from "~/types/testing";
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 const invalidateMock = vi.fn();
@@ -15,14 +19,6 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 import { DefaultCatchBoundary } from "../DefaultCatchBoundary";
-
-type ElementWithChildrenProps = {
-  children?: ReactNode;
-};
-
-type ClickableElementProps = ElementWithChildrenProps & {
-  onClick: (event?: { preventDefault: () => void }) => void;
-};
 
 function getActionElements(tree: ReactElement) {
   const root = tree as ReactElement<ElementWithChildrenProps>;
