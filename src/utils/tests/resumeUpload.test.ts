@@ -21,11 +21,7 @@ type SessionResponse = {
 function createSupabaseMock(options?: {
   sessionResponse?: SessionResponse;
   uploadResponses?: Array<{
-    error: {
-      name?: string;
-      message: string;
-      statusCode?: string | number;
-    } | null;
+    error: unknown;
   }>;
   refreshResponse?: {
     data: { session: { access_token?: string } | null };
@@ -318,6 +314,104 @@ describe("resumeUpload utils", () => {
 
     expect(refreshSessionMock).not.toHaveBeenCalled();
     expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns generic upload failure when error has no message", async () => {
+    const { client } = createSupabaseMock({
+      uploadResponses: [{ error: 123 }],
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Upload failed with status 500.");
+  });
+
+  it("throws session-expired when unauthorized upload and refresh fails", async () => {
+    const { client, refreshSessionMock, uploadMock } = createSupabaseMock({
+      uploadResponses: [
+        { error: { message: "Unauthorized", statusCode: "401" } },
+      ],
+      refreshResponse: {
+        data: { session: null },
+        error: new Error("refresh failed"),
+      },
+    });
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("Your session has expired. Please sign in again.");
+
+    expect(refreshSessionMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rethrows original Error when unauthorized upload and refresh returns no token", async () => {
+    const originalUploadError = new Error("jwt expired");
+    const uploadMock = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: originalUploadError });
+    const refreshSessionMock = vi.fn().mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    const client = {
+      auth: {
+        getSession: vi.fn(),
+        refreshSession: refreshSessionMock,
+      },
+      storage: {
+        from: vi.fn().mockReturnValue({
+          upload: uploadMock,
+        }),
+      },
+      from: vi.fn(),
+    } as unknown as SupabaseClient;
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow("jwt expired");
+
+    expect(refreshSessionMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects if signal aborts after upload starts", async () => {
+    const { client } = createSupabaseMock();
+    const controller = new AbortController();
+
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: (progress) => {
+          if (progress === 0) {
+            controller.abort();
+          }
+        },
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("Upload canceled");
   });
 
   it("rejects when upload is already aborted", async () => {
