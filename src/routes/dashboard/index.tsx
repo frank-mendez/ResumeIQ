@@ -3,11 +3,11 @@ import * as React from "react";
 import { DashboardSidebar } from "~/components/dashboard/DashboardSidebar";
 import { DashboardUploadSection } from "~/components/dashboard/DashboardUploadSection";
 import { DashboardWelcomeCard } from "~/components/dashboard/DashboardWelcomeCard";
-import { QuickActionsCard } from "~/components/dashboard/QuickActionsCard";
 import { ResumeListCard } from "~/components/dashboard/ResumeListCard";
 import type { ResumeListItem } from "~/components/dashboard/types";
 import { makeTitle, seo } from "~/utils/seo";
 import {
+  RESUME_STORAGE_BUCKET,
   insertResumeMetadataWithSession,
   getResumeTitle,
   getResumeUploadMaxBytes,
@@ -18,10 +18,7 @@ import {
   validateResumeFile,
 } from "~/utils/resumeUpload";
 import { requireDashboardAuth } from "~/utils/routeAuth";
-import {
-  getSupabaseBrowserClient,
-  getSupabaseBrowserConfig,
-} from "~/utils/supabase.browser";
+import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
 export const Route = createFileRoute("/dashboard/")({
   beforeLoad: async ({ context, location }) => {
@@ -219,9 +216,8 @@ function Dashboard() {
     }
 
     const fileToUpload = selectedFile;
-    const userId = user?.id;
 
-    if (!fileToUpload || !userId) {
+    if (!fileToUpload) {
       setUploadError("Upload failed. Please try again.");
       setUploadState("failed");
       return;
@@ -240,7 +236,19 @@ function Dashboard() {
     setUploadProgress(0);
 
     const supabase = getSupabaseBrowserClient();
-    const { supabaseUrl, supabaseAnonKey } = getSupabaseBrowserConfig();
+
+    const {
+      data: { user: authenticatedUser },
+      error: userLookupError,
+    } = await supabase.auth.getUser();
+
+    if (userLookupError || !authenticatedUser?.id) {
+      setUploadError("Your session has expired. Please sign in again.");
+      setUploadState("failed");
+      return;
+    }
+
+    const userId = authenticatedUser.id;
 
     const resumeId = globalThis.crypto.randomUUID();
     const originalFilename = normalizeOriginalFilename(fileToUpload.name);
@@ -254,9 +262,7 @@ function Dashboard() {
     try {
       await uploadFileToSupabaseStorageWithProgress({
         supabase,
-        supabaseUrl,
-        supabaseAnonKey,
-        bucket: "resumes",
+        bucket: RESUME_STORAGE_BUCKET,
         path: storagePath,
         file: fileToUpload,
         onProgress: (progress) => {
@@ -271,8 +277,6 @@ function Dashboard() {
 
       await insertResumeMetadataWithSession({
         supabase,
-        supabaseUrl,
-        supabaseAnonKey,
         record: {
           id: resumeId,
           user_id: userId,
@@ -291,7 +295,7 @@ function Dashboard() {
       });
     } catch (error) {
       const { error: cleanupError } = await supabase.storage
-        .from("resumes")
+        .from(RESUME_STORAGE_BUCKET)
         .remove([storagePath]);
 
       if (cleanupError) {
@@ -333,8 +337,6 @@ function Dashboard() {
     };
   }, [loadResumes]);
 
-  const pickedFileName = selectedFile?.name ?? null;
-
   return (
     <main>
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
@@ -342,22 +344,18 @@ function Dashboard() {
           <DashboardSidebar />
 
           <div className="min-w-0 space-y-6">
-            <DashboardWelcomeCard
-              pickedFileName={pickedFileName}
-              onUpload={openPicker}
-            />
+            <DashboardWelcomeCard />
 
             <section
               id="overview"
               aria-label="Overview"
-              className="grid gap-4 lg:grid-cols-2"
+              className="grid gap-4 lg:grid-cols-1"
             >
               <ResumeListCard
                 resumes={resumes}
                 isLoading={isLoadingResumes}
                 loadError={resumeLoadError}
               />
-              <QuickActionsCard onUpload={openPicker} />
             </section>
 
             <DashboardUploadSection

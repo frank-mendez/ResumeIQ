@@ -45,16 +45,14 @@ describe("Dashboard components", () => {
     expect(html).toContain("Drag and drop your resume here");
   });
 
-  it("renders DashboardWelcomeCard selected filename and fallback text", () => {
-    const withFileHtml = renderToStaticMarkup(
-      <DashboardWelcomeCard pickedFileName="resume.pdf" onUpload={vi.fn()} />,
-    );
-    const withoutFileHtml = renderToStaticMarkup(
-      <DashboardWelcomeCard pickedFileName={null} onUpload={vi.fn()} />,
-    );
+  it("renders DashboardWelcomeCard welcome content", () => {
+    const html = renderToStaticMarkup(<DashboardWelcomeCard />);
 
-    expect(withFileHtml).toContain("Selected: resume.pdf");
-    expect(withoutFileHtml).toContain("PDF or DOCX up to 5MB");
+    expect(html).toContain("ResumeIQ");
+    expect(html).toContain("Welcome back");
+    expect(html).toContain(
+      "Upload a resume to start getting clear, actionable feedback.",
+    );
   });
 
   it("renders QuickActionsCard call-to-actions", () => {

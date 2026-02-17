@@ -1,4 +1,6 @@
--- Ensure secure private storage for uploaded resumes
+-- Fix storage RLS for resume uploads in the resumes bucket
+-- Ensures authenticated users can only manage files under <auth.uid()>/...
+
 create or replace function public.resume_storage_bucket_name()
 returns text
 language sql
@@ -19,7 +21,8 @@ values (
   ]
 )
 on conflict (id) do update
-set public = excluded.public,
+set name = excluded.name,
+    public = excluded.public,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
@@ -34,7 +37,7 @@ create policy "Users can upload own resumes"
   to authenticated
   with check (
     bucket_id = public.resume_storage_bucket_name()
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and split_part(name, '/', 1) = auth.uid()::text
   );
 
 create policy "Users can read own resumes"
@@ -43,7 +46,7 @@ create policy "Users can read own resumes"
   to authenticated
   using (
     bucket_id = public.resume_storage_bucket_name()
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and split_part(name, '/', 1) = auth.uid()::text
   );
 
 create policy "Users can update own resumes"
@@ -52,11 +55,11 @@ create policy "Users can update own resumes"
   to authenticated
   using (
     bucket_id = public.resume_storage_bucket_name()
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and split_part(name, '/', 1) = auth.uid()::text
   )
   with check (
     bucket_id = public.resume_storage_bucket_name()
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and split_part(name, '/', 1) = auth.uid()::text
   );
 
 create policy "Users can delete own resumes"
@@ -65,5 +68,5 @@ create policy "Users can delete own resumes"
   to authenticated
   using (
     bucket_id = public.resume_storage_bucket_name()
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and split_part(name, '/', 1) = auth.uid()::text
   );
