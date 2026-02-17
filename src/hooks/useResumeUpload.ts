@@ -15,7 +15,7 @@ import {
   normalizeOriginalFilename,
   sanitizeStorageFilename,
   validateResumeFile,
-} from "../utils/resumeFile";
+} from "~/utils/resumeFile";
 
 function toUploadErrorMessage(error: unknown) {
   if (error instanceof DOMException && error.name === "AbortError") {

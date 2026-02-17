@@ -7,6 +7,7 @@ export default defineConfig({
     port: 3000,
   },
   test: {
+    environment: "jsdom",
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "json", "json-summary"],

@@ -8,8 +8,8 @@ import type {
 } from "~/types/resume";
 import { getSupabaseBrowserClient } from "~/utils/supabase.browser";
 
-export async function getAuthenticatedUserId() {
-  const supabase = getSupabaseBrowserClient();
+export async function getAuthenticatedUserId(supabaseClient?: SupabaseClient) {
+  const supabase = supabaseClient ?? getSupabaseBrowserClient();
   const {
     data: { user },
     error,

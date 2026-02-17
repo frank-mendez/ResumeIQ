@@ -17,7 +17,8 @@ const dashboardAuthMiddleware = createMiddleware().server(
     const { data } = await supabase.auth.getUser();
 
     if (!data.user) {
-      const location = `/login?redirect=${encodeURIComponent(`${pathname}${url.search}`)}`;
+      const redirectPath = pathname + url.search;
+      const location = `/login?redirect=${encodeURIComponent(redirectPath)}`;
       throw new Response(null, {
         status: 302,
         headers: {

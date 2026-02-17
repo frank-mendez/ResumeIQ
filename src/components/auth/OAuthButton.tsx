@@ -20,7 +20,7 @@ export function OAuthButton({
   loading,
   disabled,
   onClick,
-}: Readonly<OAuthButtonProps>) {
+}: OAuthButtonProps) {
   const ProviderIcon = providerIcons[provider];
 
   return (

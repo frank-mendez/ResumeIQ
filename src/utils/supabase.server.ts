@@ -1,6 +1,19 @@
 import { getCookies, setCookie } from "@tanstack/react-start/server";
-import { createServerClient } from "@supabase/ssr";
-import type { CookieToSet } from "~/types/supabase";
+import {
+  createServerClient,
+  type CookieMethodsServer,
+  type CookieOptions,
+} from "@supabase/ssr";
+
+const createServerClientWithCookieMethods = createServerClient as (
+  supabaseUrl: string,
+  supabaseKey: string,
+  options: {
+    cookieEncoding?: "raw" | "base64url";
+    cookieOptions?: { name?: string } & CookieOptions;
+    cookies: CookieMethodsServer;
+  },
+) => ReturnType<typeof createServerClient>;
 
 export function getSupabaseServerClient() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -12,19 +25,27 @@ export function getSupabaseServerClient() {
     );
   }
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return Object.entries(getCookies()).map(([name, value]) => ({
-          name,
-          value,
-        }));
-      },
-      setAll(cookies: Array<CookieToSet>) {
-        cookies.forEach((cookie: CookieToSet) => {
-          setCookie(cookie.name, cookie.value, cookie.options);
-        });
-      },
+  const cookies: CookieMethodsServer = {
+    getAll() {
+      return Object.entries(getCookies()).map(([name, value]) => ({
+        name,
+        value,
+      }));
     },
+    setAll(
+      cookiesToSet: Array<{
+        name: string;
+        value: string;
+        options: CookieOptions;
+      }>,
+    ) {
+      cookiesToSet.forEach((cookie) => {
+        setCookie(cookie.name, cookie.value, cookie.options);
+      });
+    },
+  };
+
+  return createServerClientWithCookieMethods(supabaseUrl, supabaseAnonKey, {
+    cookies,
   });
 }
