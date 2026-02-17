@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const DEFAULT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
+export const RESUME_STORAGE_BUCKET = "resumes";
+
 export const ACCEPTED_RESUME_MIME_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -122,17 +124,29 @@ function parseUploadErrorMessage(responseText: string | null, status: number) {
   }
 }
 
-function encodeStoragePath(path: string) {
-  return path
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
+function isUnauthorizedStorageError(
+  error: {
+    message?: string;
+    statusCode?: string | number;
+  } | null,
+) {
+  if (!error) {
+    return false;
+  }
+
+  const statusCode = String(error.statusCode ?? "");
+  const message = (error.message ?? "").toLowerCase();
+
+  return (
+    statusCode === "401" ||
+    statusCode === "403" ||
+    message.includes("unauthorized") ||
+    message.includes("jwt")
+  );
 }
 
 export async function uploadFileToSupabaseStorageWithProgress({
   supabase,
-  supabaseUrl,
-  supabaseAnonKey,
   bucket,
   path,
   file,
@@ -140,108 +154,76 @@ export async function uploadFileToSupabaseStorageWithProgress({
   signal,
 }: {
   supabase: SupabaseClient;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
   bucket: string;
   path: string;
   file: File;
   onProgress: (progress: number) => void;
   signal?: AbortSignal;
 }) {
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    throw sessionError;
+  if (signal?.aborted) {
+    throw new DOMException("Upload canceled", "AbortError");
   }
 
-  const accessToken = session?.access_token;
+  onProgress(0);
 
-  if (!accessToken) {
-    throw new Error("Your session has expired. Please sign in again.");
-  }
+  const uploadOnce = async () => {
+    const { error } = await supabase.storage.from(bucket).upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
 
-  const uploadUrl = `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(path)}`;
+    if (error) {
+      throw error;
+    }
+  };
 
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const abortHandler = () => xhr.abort();
-    let settled = false;
+  try {
+    await uploadOnce();
+  } catch (error) {
+    const storageError =
+      error && typeof error === "object"
+        ? (error as {
+            message?: string;
+            statusCode?: string | number;
+          })
+        : null;
 
-    const cleanup = () => {
-      if (!signal) {
-        return;
+    if (!isUnauthorizedStorageError(storageError)) {
+      if (error instanceof Error) {
+        throw error;
       }
 
-      signal.removeEventListener("abort", abortHandler);
-    };
-
-    const finish = (callback: () => void) => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      cleanup();
-      callback();
-    };
-
-    xhr.open("POST", uploadUrl);
-    xhr.setRequestHeader("authorization", `Bearer ${accessToken}`);
-    xhr.setRequestHeader("apikey", supabaseAnonKey);
-    xhr.setRequestHeader("x-upsert", "false");
-    xhr.setRequestHeader("content-type", file.type);
-
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) {
-        return;
-      }
-
-      const progress = Math.min(
-        100,
-        Math.max(0, Math.round((event.loaded / event.total) * 100)),
-      );
-      onProgress(progress);
-    };
-
-    xhr.onerror = () => {
-      finish(() => {
-        reject(new Error("Network error while uploading. Please try again."));
-      });
-    };
-
-    xhr.onabort = () => {
-      finish(() => {
-        reject(new DOMException("Upload canceled", "AbortError"));
-      });
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        finish(() => {
-          resolve();
-        });
-        return;
-      }
-
-      finish(() => {
-        reject(
-          new Error(parseUploadErrorMessage(xhr.responseText, xhr.status)),
-        );
-      });
-    };
-
-    signal?.addEventListener("abort", abortHandler);
-
-    if (signal?.aborted) {
-      xhr.abort();
-      return;
+      throw new Error(parseUploadErrorMessage(null, 500));
     }
 
-    xhr.send(file);
-  });
+    const { data: refreshData, error: refreshError } =
+      await supabase.auth.refreshSession();
+
+    if (refreshError) {
+      if (error instanceof Error) {
+        throw error;
+      }
+
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+
+    const refreshedAccessToken = refreshData.session?.access_token;
+    if (!refreshedAccessToken) {
+      if (error instanceof Error) {
+        throw error;
+      }
+
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+
+    await uploadOnce();
+  }
+
+  if (signal?.aborted) {
+    throw new DOMException("Upload canceled", "AbortError");
+  }
+
+  onProgress(100);
 }
 
 type ResumeInsertRecord = {
@@ -255,13 +237,9 @@ type ResumeInsertRecord = {
 
 export async function insertResumeMetadataWithSession({
   supabase,
-  supabaseUrl,
-  supabaseAnonKey,
   record,
 }: {
   supabase: SupabaseClient;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
   record: ResumeInsertRecord;
 }) {
   const {
@@ -279,40 +257,11 @@ export async function insertResumeMetadataWithSession({
     throw new Error("Your session has expired. Please sign in again.");
   }
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/resumes`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      apikey: supabaseAnonKey,
-      "content-type": "application/json",
-      prefer: "return=minimal",
-    },
-    body: JSON.stringify(record),
-  });
+  const { error } = await supabase.from("resumes").insert(record);
 
-  if (response.ok) {
+  if (!error) {
     return;
   }
 
-  let message = `Unable to save resume metadata (${response.status}).`;
-
-  try {
-    const payload = (await response.json()) as {
-      message?: string;
-      error?: string;
-      hint?: string;
-      details?: string;
-    };
-
-    message =
-      payload.message ??
-      payload.error ??
-      payload.details ??
-      payload.hint ??
-      message;
-  } catch {
-    message = `Unable to save resume metadata (${response.status}).`;
-  }
-
-  throw new Error(message);
+  throw new Error(error.message ?? "Unable to save resume metadata.");
 }

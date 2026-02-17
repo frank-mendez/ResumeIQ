@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   formatFileSize,
-  insertResumeMetadataWithSession,
-  getResumeUploadMaxBytes,
   getResumeTitle,
+  getResumeUploadMaxBytes,
+  insertResumeMetadataWithSession,
   mapMimeTypeToResumeFileType,
   normalizeOriginalFilename,
   sanitizeStorageFilename,
@@ -18,66 +18,76 @@ type SessionResponse = {
   error: Error | null;
 };
 
-function createSupabaseSessionMock(response: SessionResponse) {
-  return {
-    auth: {
-      getSession: vi.fn().mockResolvedValue(response),
+function createSupabaseMock(options?: {
+  sessionResponse?: SessionResponse;
+  uploadResponses?: Array<{
+    error: { message: string; statusCode?: string } | null;
+  }>;
+  refreshResponse?: {
+    data: { session: { access_token?: string } | null };
+    error: Error | null;
+  };
+  insertError?: { message?: string } | null;
+}) {
+  const uploadMock = vi.fn();
+  const uploadResponses = options?.uploadResponses ?? [{ error: null }];
+
+  for (const response of uploadResponses) {
+    uploadMock.mockResolvedValueOnce({ data: null, error: response.error });
+  }
+
+  const insertMock = vi.fn().mockResolvedValue({
+    data: null,
+    error: options?.insertError ?? null,
+  });
+
+  const getSessionMock = vi.fn().mockResolvedValue(
+    options?.sessionResponse ?? {
+      data: { session: { access_token: "token-123" } },
+      error: null,
     },
+  );
+
+  const refreshSessionMock = vi.fn().mockResolvedValue(
+    options?.refreshResponse ?? {
+      data: { session: { access_token: "token-refreshed" } },
+      error: null,
+    },
+  );
+
+  const client = {
+    auth: {
+      getSession: getSessionMock,
+      refreshSession: refreshSessionMock,
+    },
+    storage: {
+      from: vi.fn().mockReturnValue({
+        upload: uploadMock,
+      }),
+    },
+    from: vi.fn().mockImplementation((table: string) => {
+      if (table !== "resumes") {
+        throw new Error(`Unexpected table: ${table}`);
+      }
+
+      return {
+        insert: insertMock,
+      };
+    }),
   } as unknown as SupabaseClient;
-}
 
-class MockXMLHttpRequest {
-  private static implementation:
-    | ((instance: MockXMLHttpRequest, file: File) => void)
-    | null = null;
-
-  static setImplementation(
-    implementation: ((instance: MockXMLHttpRequest, file: File) => void) | null,
-  ) {
-    MockXMLHttpRequest.implementation = implementation;
-  }
-
-  static resetImplementation() {
-    MockXMLHttpRequest.implementation = null;
-  }
-
-  upload: { onprogress?: (event: ProgressEvent) => void } = {};
-  headers: Record<string, string> = {};
-  status = 200;
-  responseText: string | null = null;
-  method = "";
-  url = "";
-  onerror: (() => void) | null = null;
-  onabort: (() => void) | null = null;
-  onload: (() => void) | null = null;
-
-  open(method: string, url: string) {
-    this.method = method;
-    this.url = url;
-  }
-
-  setRequestHeader(key: string, value: string) {
-    this.headers[key] = value;
-  }
-
-  send(file: File) {
-    if (!MockXMLHttpRequest.implementation) {
-      this.onload?.();
-      return;
-    }
-
-    MockXMLHttpRequest.implementation(this, file);
-  }
-
-  abort() {
-    this.onabort?.();
-  }
+  return {
+    client,
+    uploadMock,
+    insertMock,
+    getSessionMock,
+    refreshSessionMock,
+  };
 }
 
 describe("resumeUpload utils", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    MockXMLHttpRequest.resetImplementation();
   });
 
   it("returns default upload max bytes when env is not set", () => {
@@ -136,236 +146,73 @@ describe("resumeUpload utils", () => {
     expect(validateResumeFile(tooLarge, maxBytes).valid).toBe(false);
   });
 
-  it("uploads to storage and reports progress", async () => {
-    const originalXhr = globalThis.XMLHttpRequest;
-    vi.stubGlobal(
-      "XMLHttpRequest",
-      MockXMLHttpRequest as unknown as typeof XMLHttpRequest,
-    );
-
-    const supabase = createSupabaseSessionMock({
-      data: { session: { access_token: "token-123" } },
-      error: null,
-    });
+  it("uploads to storage using supabase client and updates progress", async () => {
+    const { client, uploadMock } = createSupabaseMock();
     const file = new File(["data"], "resume.pdf", { type: "application/pdf" });
-    const progressUpdates: number[] = [];
+    const progress: number[] = [];
 
-    MockXMLHttpRequest.setImplementation((xhr) => {
-      xhr.upload.onprogress?.({
-        lengthComputable: false,
-        loaded: 0,
-        total: 100,
-      } as ProgressEvent);
-      xhr.upload.onprogress?.({
-        lengthComputable: true,
-        loaded: 40,
-        total: 100,
-      } as ProgressEvent);
-      xhr.upload.onprogress?.({
-        lengthComputable: true,
-        loaded: 120,
-        total: 100,
-      } as ProgressEvent);
-      xhr.status = 200;
-      xhr.onload?.();
+    await uploadFileToSupabaseStorageWithProgress({
+      supabase: client,
+      bucket: "resumes",
+      path: "user-id/resume-id/resume.pdf",
+      file,
+      onProgress: (value) => progress.push(value),
+    });
+
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledWith(
+      "user-id/resume-id/resume.pdf",
+      file,
+      {
+        contentType: "application/pdf",
+        upsert: false,
+      },
+    );
+    expect(progress).toEqual([0, 100]);
+  });
+
+  it("retries upload once when unauthorized after refresh", async () => {
+    const { client, uploadMock, refreshSessionMock } = createSupabaseMock({
+      uploadResponses: [
+        { error: { message: "Unauthorized", statusCode: "400" } },
+        { error: null },
+      ],
     });
 
     await uploadFileToSupabaseStorageWithProgress({
-      supabase,
-      supabaseUrl: "https://example.supabase.co",
-      supabaseAnonKey: "anon-key",
-      bucket: "resumes",
-      path: "user id/folder/resume final.pdf",
-      file,
-      onProgress: (progress) => progressUpdates.push(progress),
-    });
-
-    expect(progressUpdates).toEqual([40, 100]);
-
-    globalThis.XMLHttpRequest = originalXhr;
-  });
-
-  it("rejects upload when session lookup fails", async () => {
-    const supabase = createSupabaseSessionMock({
-      data: { session: null },
-      error: new Error("session error"),
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("session error");
-  });
-
-  it("rejects upload when token is missing", async () => {
-    const supabase = createSupabaseSessionMock({
-      data: { session: {} },
-      error: null,
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("Your session has expired");
-  });
-
-  it("handles upload network, abort, and server errors", async () => {
-    const originalXhr = globalThis.XMLHttpRequest;
-    vi.stubGlobal(
-      "XMLHttpRequest",
-      MockXMLHttpRequest as unknown as typeof XMLHttpRequest,
-    );
-
-    const supabase = createSupabaseSessionMock({
-      data: { session: { access_token: "token-123" } },
-      error: null,
-    });
-    const file = new File(["data"], "resume.pdf", { type: "application/pdf" });
-
-    MockXMLHttpRequest.setImplementation((xhr) => {
-      xhr.onerror?.();
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file,
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("Network error while uploading");
-
-    MockXMLHttpRequest.setImplementation((xhr) => {
-      xhr.status = 403;
-      xhr.responseText = JSON.stringify({ message: "forbidden" });
-      xhr.onload?.();
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file,
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("forbidden");
-
-    MockXMLHttpRequest.setImplementation((xhr) => {
-      xhr.status = 409;
-      xhr.responseText = JSON.stringify({ error: "already exists" });
-      xhr.onload?.();
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file,
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("already exists");
-
-    MockXMLHttpRequest.setImplementation((xhr) => {
-      xhr.status = 500;
-      xhr.responseText = "not-json";
-      xhr.onload?.();
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file,
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("Upload failed with status 500.");
-
-    MockXMLHttpRequest.setImplementation((xhr) => {
-      xhr.status = 502;
-      xhr.responseText = null;
-      xhr.onload?.();
-    });
-
-    await expect(
-      uploadFileToSupabaseStorageWithProgress({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        bucket: "resumes",
-        path: "user/resume.pdf",
-        file,
-        onProgress: vi.fn(),
-      }),
-    ).rejects.toThrow("Upload failed with status 502.");
-
-    MockXMLHttpRequest.setImplementation(() => {
-      // wait for abort signal to trigger xhr.abort()
-    });
-
-    const controller = new AbortController();
-    const uploadPromise = uploadFileToSupabaseStorageWithProgress({
-      supabase,
-      supabaseUrl: "https://example.supabase.co",
-      supabaseAnonKey: "anon-key",
+      supabase: client,
       bucket: "resumes",
       path: "user/resume.pdf",
-      file,
+      file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
       onProgress: vi.fn(),
-      signal: controller.signal,
     });
 
-    await new Promise<void>((resolve) => {
-      setTimeout(() => resolve(), 0);
-    });
+    expect(refreshSessionMock).toHaveBeenCalledTimes(1);
+    expect(uploadMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects when upload is already aborted", async () => {
+    const { client } = createSupabaseMock();
+    const controller = new AbortController();
     controller.abort();
-    await expect(uploadPromise).rejects.toThrow("Upload canceled");
 
-    globalThis.XMLHttpRequest = originalXhr;
+    await expect(
+      uploadFileToSupabaseStorageWithProgress({
+        supabase: client,
+        bucket: "resumes",
+        path: "user/resume.pdf",
+        file: new File(["data"], "resume.pdf", { type: "application/pdf" }),
+        onProgress: vi.fn(),
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("Upload canceled");
   });
 
   it("inserts resume metadata with authenticated session", async () => {
-    const supabase = createSupabaseSessionMock({
-      data: { session: { access_token: "token-123" } },
-      error: null,
-    });
-
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: vi.fn(),
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    const { client, insertMock } = createSupabaseMock();
 
     await insertResumeMetadataWithSession({
-      supabase,
-      supabaseUrl: "https://example.supabase.co",
-      supabaseAnonKey: "anon-key",
+      supabase: client,
       record: {
         id: "resume-id",
         user_id: "user-id",
@@ -376,20 +223,28 @@ describe("resumeUpload utils", () => {
       },
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(insertMock).toHaveBeenCalledWith({
+      id: "resume-id",
+      user_id: "user-id",
+      original_filename: "resume.pdf",
+      file_type: "pdf",
+      storage_path: "user-id/resume-id/resume.pdf",
+      title: "resume",
+    });
   });
 
-  it("handles metadata insert session and fetch errors", async () => {
-    const sessionErrorClient = createSupabaseSessionMock({
-      data: { session: null },
-      error: new Error("session failed"),
-    });
+  it("handles metadata insert session and insert errors", async () => {
+    const sessionErrorClient = createSupabaseMock({
+      sessionResponse: {
+        data: { session: null },
+        error: new Error("session failed"),
+      },
+    }).client;
 
     await expect(
       insertResumeMetadataWithSession({
         supabase: sessionErrorClient,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
         record: {
           id: "resume-id",
           user_id: "user-id",
@@ -401,16 +256,16 @@ describe("resumeUpload utils", () => {
       }),
     ).rejects.toThrow("session failed");
 
-    const noTokenClient = createSupabaseSessionMock({
-      data: { session: {} },
-      error: null,
-    });
+    const noTokenClient = createSupabaseMock({
+      sessionResponse: {
+        data: { session: {} },
+        error: null,
+      },
+    }).client;
 
     await expect(
       insertResumeMetadataWithSession({
         supabase: noTokenClient,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
         record: {
           id: "resume-id",
           user_id: "user-id",
@@ -422,23 +277,13 @@ describe("resumeUpload utils", () => {
       }),
     ).rejects.toThrow("Your session has expired");
 
-    const supabase = createSupabaseSessionMock({
-      data: { session: { access_token: "token-123" } },
-      error: null,
-    });
-
-    const withMessage = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: vi.fn().mockResolvedValue({ message: "invalid payload" }),
-    });
-    vi.stubGlobal("fetch", withMessage);
+    const insertErrorClient = createSupabaseMock({
+      insertError: { message: "insert failed" },
+    }).client;
 
     await expect(
       insertResumeMetadataWithSession({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
+        supabase: insertErrorClient,
         record: {
           id: "resume-id",
           user_id: "user-id",
@@ -448,29 +293,6 @@ describe("resumeUpload utils", () => {
           title: "resume",
         },
       }),
-    ).rejects.toThrow("invalid payload");
-
-    const withBadJson = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: vi.fn().mockRejectedValue(new Error("bad json")),
-    });
-    vi.stubGlobal("fetch", withBadJson);
-
-    await expect(
-      insertResumeMetadataWithSession({
-        supabase,
-        supabaseUrl: "https://example.supabase.co",
-        supabaseAnonKey: "anon-key",
-        record: {
-          id: "resume-id",
-          user_id: "user-id",
-          original_filename: "resume.pdf",
-          file_type: "pdf",
-          storage_path: "user-id/resume-id/resume.pdf",
-          title: "resume",
-        },
-      }),
-    ).rejects.toThrow("Unable to save resume metadata (503).");
+    ).rejects.toThrow("insert failed");
   });
 });

@@ -128,7 +128,7 @@ export function DashboardUploadSection({
 
       <label
         htmlFor="resume-upload-input"
-        className={`mt-6 rounded-xl border border-dashed p-6 text-sm transition-colors ${
+        className={`mt-6 rounded-xl p-6 text-sm transition-colors ${
           isDragging
             ? "border-gray-500 bg-white dark:border-gray-500 dark:bg-gray-950"
             : "border-gray-300 bg-white/40 dark:border-gray-700 dark:bg-gray-950/20"
