@@ -1,0 +1,12 @@
+services:
+  resumeiq:
+    container_name: resumeiq
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
