@@ -18,7 +18,9 @@
     "database:login": "npx supabase login",
     "database:init": "npx supabase init",
     "generate-routes": "npx @tanstack/router-cli generate",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": "eslint --max-warnings=0"
